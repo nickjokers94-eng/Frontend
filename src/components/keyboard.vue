@@ -1,6 +1,10 @@
 <script setup>
 defineProps({
-  colors: Object
+  colors: Object,
+  disabled: {
+    type: Boolean,
+    default: false
+  }
 })
 const emit = defineEmits(['add', 'delete', 'submit'])
 
@@ -29,6 +33,7 @@ function handleKeyPress(key) {
         :key="key"
         class="key"
         :class="[key.length > 1 ? 'large' : '', colors[key]]"
+        :disabled="disabled"
         @click="handleKeyPress(key)"
       >
         {{ key }}
@@ -44,7 +49,6 @@ function handleKeyPress(key) {
   font-size: 2rem;
   margin: 6px;
   border-radius: 6px;
-  /* Optional: für bessere Touch-Bedienung */
   touch-action: manipulation;
 }
 .key.large {

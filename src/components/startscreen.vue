@@ -1,4 +1,3 @@
-<!-- src/components/StartScreen.vue -->
 <script setup>
 import { ref } from 'vue'
 import { loginAPI, registerAPI } from '../api.js'
@@ -37,7 +36,6 @@ async function register() {
   try {
     const result = await registerAPI(username.value, password.value)
     success.value = 'Registrierung erfolgreich! Warte auf Admin-Freischaltung.'
-    // Felder leeren nach erfolgreicher Registrierung
     username.value = ''
     password.value = ''
   } catch (err) {

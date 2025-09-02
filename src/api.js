@@ -1,64 +1,19 @@
-// src/api.js
-
-// --- Hilfsfunktionen für IDs ---
-function generateId() {
-    return Math.random().toString(36).substr(2, 9);
-}
-
-// --- Mock Database mit IDs ---
-let mockUsers = [
-    { id: generateId(), user: 'admin@example.com', password: 'admin', score: 2000, role: 'admin', active: true },
-    { id: generateId(), user: 'NickJokers', password: '123', score: 1250, role: 'admin', active: true },
-    { id: generateId(), user: 'user2@example.com', password: 'abc', score: 1100, role: 'user', active: false },
-    { id: generateId(), user: 'TestUser', password: 'def', score: 950, role: 'user', active: true },
-];
-
-let wordList = [
-    { id: generateId(), word: 'hallo' },
-    { id: generateId(), word: 'apfel' },
-    { id: generateId(), word: 'sonne' },
-    { id: generateId(), word: 'wolke' },
-    { id: generateId(), word: 'vogel' },
-    { id: generateId(), word: 'audio' },
-    { id: generateId(), word: 'brief' },
-    { id: generateId(), word: 'radio' }
-];
-
-let solutionWord = '';
-let lastSolutionWord = '';
-let rounds = [];
-let currentRound = null;
-
-// --- Hilfsfunktionen ---
-function hashPassword(pw) {
-    // Platzhalter für echte Verschlüsselung
-    return 'hashed_' + pw;
-}
-function isEmail(email) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-function isValidUsername(username) {
-    return /^[a-zA-Z0-9_@.-]+$/.test(username) && username.length >= 3;
-}
-function isValidPassword(pw) {
-    return typeof pw === 'string' && pw.length >= 3;
-}
-function isValidWord(word) {
-    return wordList.some(w => w.word === word.toLowerCase());
-}
-function getWordById(id) {
-    return wordList.find(w => w.id === id);
-}
-function getUserById(id) {
-    return mockUsers.find(u => u.id === id);
-}
+// src/api.js - Echte Backend-Integration
 
 // API-Konfiguration für Backend-Integration
 const API_BASE_URL = 'http://localhost:8080'; // Spring Boot Standard-Port
-const USE_MOCK = false; // Auf false setzen für echtes Backend
 
-// Hilfsfunktion für API-Calls
-async function apiCall(endpoint, method = 'GET', data = null) {
+// --- Hilfsfunktionen ---
+function isValidUsername(username) {
+    return /^[a-zA-Z0-9_@.-]+$/.test(username) && username.length >= 3;
+}
+
+function isValidPassword(pw) {
+    return typeof pw === 'string' && pw.length >= 3;
+}
+
+// Hilfsfunktion für API-Aufrufe mit HTTP Basic Auth (da Backend Security konfiguriert ist)
+async function apiCall(endpoint, method = 'GET', data = null, requiresAuth = false, credentials = null) {
   const config = {
     method,
     headers: {
@@ -66,531 +21,502 @@ async function apiCall(endpoint, method = 'GET', data = null) {
     }
   };
   
-  if (data && (method === 'POST' || method === 'PUT')) {
+  // HTTP Basic Auth hinzufügen falls nötig
+  if (requiresAuth && credentials) {
+    const authHeader = 'Basic ' + btoa(credentials.username + ':' + credentials.password);
+    config.headers['Authorization'] = authHeader;
+  }
+  
+  if (data && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
     config.body = new URLSearchParams(data);
   }
   
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-  
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Ungültige Anmeldedaten');
+      }
+      if (response.status === 403) {
+        throw new Error('Keine Berechtigung');
+      }
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    return {
+      success: true,
+      data: result
+    };
+  } catch (error) {
+    throw {
+      success: false,
+      error: error.message
+    };
   }
-  
-  // Backend gibt boolean zurück, wir formatieren es für Frontend
-  const result = await response.json();
-  return {
-    success: result === true || result.success === true,
-    data: result,
-    message: result === true ? 'Erfolgreich' : result.message || 'Aktion ausgeführt'
-  };
 }
 
-// --- API Funktionen ---
+// --- API-Funktionen ---
 
 /**
  * Registrierung eines neuen Users.
- * @param {string} user
+ * @param {string} username
  * @param {string} password
  * @returns {Promise<object>}
  */
-export function registerAPI(user, password) {
-    if (USE_MOCK) {
-        return new Promise((resolve, reject) => {
-            if (!isValidUsername(user)) return reject({ success: false, error: 'Ungültiger Benutzername. Nur Buchstaben, Zahlen, _, @, . und - erlaubt.' });
-            if (!isValidPassword(password)) return reject({ success: false, error: 'Passwort zu kurz (min. 3 Zeichen).' });
-            if (mockUsers.find(u => u.user === user)) return reject({ success: false, error: 'Benutzername bereits registriert.' });
-            const newUser = {
-                id: generateId(),
-                user,
-                password: hashPassword(password),
-                score: 0,
-                role: 'user',
-                active: false // Muss erst freigeschaltet werden
-            };
-            mockUsers.push(newUser);
-            resolve({ success: true, message: 'Registrierung erfolgreich. Bitte warte auf Freischaltung.' });
-        });
-    } else {
-        // Backend-Integration - einfach boolean verarbeiten
-        return fetch(`${API_BASE_URL}/user/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ username: user, password })
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Registrierung fehlgeschlagen (HTTP ${response.status})`);
-            }
-            return response.json(); // Backend gibt boolean zurück
-        })
-        .then(success => {
-            // Boolean direkt verarbeiten - kein einheitliches Format nötig
-            if (success) {
-                return { success: true, message: 'Registrierung erfolgreich. Warte auf Freischaltung.' };
-            } else {
-                throw new Error('Registrierung fehlgeschlagen');
-            }
-        })
-        .catch(error => {
-            throw { success: false, error: error.message };
-        });
+export async function registerAPI(username, password) {
+    if (!isValidUsername(username)) {
+        throw { success: false, error: 'Ungültiger Benutzername. Nur Buchstaben, Zahlen, _, @, . und - erlaubt.' };
     }
-}
-
-/**
- * Login (nur aktive User).
- */
-export function loginAPI(user, password) {
-    if (USE_MOCK) {
-        return new Promise((resolve, reject) => {
-            const foundUser = mockUsers.find(u => u.user === user);
-            if (!foundUser) return reject({ success: false, error: 'Benutzer nicht gefunden.' });
-            if (!foundUser.active) return reject({ success: false, error: 'Benutzer ist nicht freigeschaltet.' });
-            if (foundUser.password !== hashPassword(password) && foundUser.password !== password) 
-                return reject({ success: false, error: 'Falsches Passwort.' });
-            resolve({ 
-                success: true, 
-                data: { 
-                    id: foundUser.id,
-                    user: foundUser.user, 
-                    score: foundUser.score, 
-                    role: foundUser.role 
-                } 
-            });
-        });
-    } else {
-        // Backend hat noch keinen Login-Endpoint, also Mock verwenden
-        return new Promise((resolve, reject) => {
-            // Simuliere Login bis Backend-Endpoint existiert
-            const mockUsers = [
-                { user: 'NickJokers', password: '123', role: 'admin', score: 1250 },
-                { user: 'TestUser', password: 'def', role: 'user', score: 950 }
-            ];
-            
-            const user = mockUsers.find(u => u.user === username && u.password === password);
-            if (user) {
-                resolve({
-                    success: true,
-                    data: { user: user.user, role: user.role, score: user.score }
-                });
-            } else {
-                reject({ success: false, error: 'Ungültige Anmeldedaten' });
-            }
-        });
+    if (!isValidPassword(password)) {
+        throw { success: false, error: 'Passwort zu kurz (min. 3 Zeichen).' };
     }
-}
 
-/**
- * Admin: User-Liste abrufen.
- */
-export function getUsersAPI(adminUser) {
-    return new Promise((resolve, reject) => {
-        const admin = mockUsers.find(u => u.user === adminUser && u.role === 'admin');
-        if (!admin) return reject({ success: false, error: 'Keine Admin-Rechte.' });
-        resolve({ 
-            success: true, 
-            data: mockUsers.map(u => ({
-                id: u.id,
-                user: u.user,
-                score: u.score,
-                role: u.role,
-                active: u.active
-            }))
-        });
-    });
-}
-
-/**
- * Admin: User freischalten/sperren.
- */
-export function setUserActiveAPI(adminUser, targetUser, active) {
-    if (USE_MOCK) {
-        return new Promise((resolve, reject) => {
-            const admin = mockUsers.find(u => u.user === adminUser && u.role === 'admin');
-            if (!admin) return reject({ success: false, error: 'Keine Admin-Rechte.' });
-            const user = mockUsers.find(u => u.user === targetUser);
-            if (!user) return reject({ success: false, error: 'Benutzer nicht gefunden.' });
-            user.active = !!active;
-            resolve({ success: true, message: 'Benutzerstatus geändert.' });
-        });
-    } else {
-        const endpoint = active ? '/user/unlockUser' : '/user/deleteUser';
-        const method = active ? 'PUT' : 'DELETE';
-        
-        return fetch(`${API_BASE_URL}${endpoint}`, {
-            method,
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ username: targetUser })
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Aktion fehlgeschlagen (HTTP ${response.status})`);
-            }
-            return response.json(); // boolean
-        })
-        .then(success => {
-            if (success) {
-                return { success: true, message: active ? 'Benutzer freigeschaltet' : 'Benutzer gelöscht' };
-            } else {
-                throw new Error(active ? 'Freischaltung fehlgeschlagen' : 'Löschung fehlgeschlagen');
-            }
-        })
-        .catch(error => {
-            throw { success: false, error: error.message };
-        });
-    }
-}
-
-/**
- * Admin: User löschen.
- */
-export function deleteUserAPI(adminUser, targetUser) {
-    if (USE_MOCK) {
-        return new Promise((resolve, reject) => {
-            const admin = mockUsers.find(u => u.user === adminUser && u.role === 'admin');
-            if (!admin) return reject({ success: false, error: 'Keine Admin-Rechte.' });
-            const userIndex = mockUsers.findIndex(u => u.user === targetUser);
-            if (userIndex === -1) return reject({ success: false, error: 'Benutzer nicht gefunden.' });
-            mockUsers.splice(userIndex, 1);
-            resolve({ success: true, message: 'Benutzer gelöscht.' });
-        });
-    } else {
-        return fetch(`${API_BASE_URL}/user/deleteUser`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ username: targetUser })
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Benutzer löschen fehlgeschlagen (HTTP ${response.status})`);
-            }
-            return response.json(); // boolean
-        })
-        .then(success => {
-            if (success) {
-                return { success: true, message: 'Benutzer gelöscht' };
-            } else {
-                throw new Error('Benutzer löschen fehlgeschlagen');
-            }
-        })
-        .catch(error => {
-            throw { success: false, error: error.message };
-        });
-    }
-}
-
-/**
- * Admin: User anlegen.
- */
-export function createUserAPI(adminUser, userData) {
-    return new Promise((resolve, reject) => {
-        const admin = mockUsers.find(u => u.user === adminUser && u.role === 'admin');
-        if (!admin) return reject({ success: false, error: 'Keine Admin-Rechte.' });
-        if (!isValidUsername(userData.user)) return reject({ success: false, error: 'Ungültiger Benutzername.' });
-        if (mockUsers.find(u => u.user === userData.user)) return reject({ success: false, error: 'Benutzername existiert bereits.' });
-        const newUser = {
-            id: generateId(),
-            user: userData.user,
-            password: hashPassword(userData.password),
-            score: userData.score || 0,
-            role: userData.role || 'user',
-            active: !!userData.active
+    try {
+        const result = await apiCall('/user/register', 'POST', { username, password });
+        return {
+            success: true,
+            message: 'Registrierung erfolgreich. Bitte warte auf Admin-Freischaltung.'
         };
-        mockUsers.push(newUser);
-        resolve({ success: true, message: 'Benutzer angelegt.', data: { id: newUser.id } });
-    });
+    } catch (error) {
+        throw error;
+    }
 }
 
 /**
- * Admin: User ändern.
+ * Benutzer-Login
+ * @param {string} username
+ * @param {string} password
+ * @returns {Promise<object>}
  */
-export function updateUserAPI(adminUser, targetUser, updates) {
-    return new Promise((resolve, reject) => {
-        const admin = mockUsers.find(u => u.user === adminUser && u.role === 'admin');
-        if (!admin) return reject({ success: false, error: 'Keine Admin-Rechte.' });
-        const user = mockUsers.find(u => u.user === targetUser);
-        if (!user) return reject({ success: false, error: 'Benutzer nicht gefunden.' });
-        
-        // Validierung für Username-Änderung
-        if (updates.user && updates.user !== targetUser) {
-            if (!isValidUsername(updates.user)) return reject({ success: false, error: 'Ungültiger neuer Benutzername.' });
-            if (mockUsers.find(u => u.user === updates.user)) return reject({ success: false, error: 'Neuer Benutzername existiert bereits.' });
+export async function loginAPI(username, password) {
+    try {
+        const testResponse = await fetch(`${API_BASE_URL}/highscores`, {
+            method: 'GET',
+            headers: {
+                'Authorization': 'Basic ' + btoa(username + ':' + password),
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!testResponse.ok) {
+            if (testResponse.status === 401) {
+                throw new Error('Ungültige Anmeldedaten');
+            }
+            throw new Error('Anmeldung fehlgeschlagen');
         }
-        
-        Object.assign(user, updates);
-        resolve({ success: true, message: 'Benutzer aktualisiert.' });
-    });
-}
 
-/**
- * Admin: Wortliste abrufen.
- */
-export function getWordsAPI(adminUser) {
-    return new Promise((resolve, reject) => {
-        const admin = mockUsers.find(u => u.user === adminUser && u.role === 'admin');
-        if (!admin) return reject({ success: false, error: 'Keine Admin-Rechte.' });
-        resolve({ success: true, data: wordList.map(w => ({ id: w.id, word: w.word })) });
-    });
-}
-
-/**
- * Admin: Wort hinzufügen.
- */
-export function addWordAPI(adminUser, word) {
-    return new Promise((resolve, reject) => {
-        const admin = mockUsers.find(u => u.user === adminUser && u.role === 'admin');
-        if (!admin) return reject({ success: false, error: 'Keine Admin-Rechte.' });
-        if (!word || word.length !== 5) return reject({ success: false, error: 'Wort muss genau 5 Buchstaben haben.' });
-        if (wordList.some(w => w.word === word.toLowerCase())) return reject({ success: false, error: 'Wort existiert bereits.' });
-        const newWord = { id: generateId(), word: word.toLowerCase() };
-        wordList.push(newWord);
-        resolve({ success: true, message: 'Wort hinzugefügt.', data: { id: newWord.id } });
-    });
-}
-
-/**
- * Admin: Wort löschen.
- */
-export function deleteWordAPI(adminUser, wordId) {
-    return new Promise((resolve, reject) => {
-        const admin = mockUsers.find(u => u.user === adminUser && u.role === 'admin');
-        if (!admin) return reject({ success: false, error: 'Keine Admin-Rechte.' });
-        const wordIndex = wordList.findIndex(w => w.id === wordId);
-        if (wordIndex === -1) return reject({ success: false, error: 'Wort nicht gefunden.' });
-        wordList.splice(wordIndex, 1);
-        resolve({ success: true, message: 'Wort gelöscht.' });
-    });
-}
-
-/**
- * Startet eine neue Runde (Admin).
- */
-export function startRoundAPI(adminUser) {
-    return new Promise((resolve, reject) => {
-        const admin = mockUsers.find(u => u.user === adminUser && u.role === 'admin');
-        if (!admin) return reject({ success: false, error: 'Keine Admin-Rechte.' });
-        lastSolutionWord = solutionWord;
-        solutionWord = wordList[Math.floor(Math.random() * wordList.length)].word;
-        currentRound = {
-            id: Date.now(),
-            word: solutionWord,
-            start: Date.now(),
-            end: null,
-            guesses: [],
-            status: 'running'
-        };
-        rounds.push(currentRound);
-        resolve({ success: true, data: { wordLength: solutionWord.length, roundId: currentRound.id }, message: 'Neue Runde gestartet.' });
-    });
-}
-
-/**
- * Gibt die aktuelle Runde zurück.
- */
-export function getCurrentRoundAPI(userAuth) {
-    return new Promise((resolve, reject) => {
-        if (userAuth) {
-            const user = mockUsers.find(u => u.user === userAuth && u.active);
-            if (!user) return reject({ success: false, error: 'Benutzer nicht authentifiziert.' });
-        }
-        
-        if (!currentRound) return resolve({ success: true, data: null });
-        resolve({
+        // Erfolgreiche Authentifizierung - User-Objekt erstellen
+        return {
             success: true,
             data: {
-                id: currentRound.id,
-                status: currentRound.status,
-                start: currentRound.start,
-                end: currentRound.end,
-                guesses: currentRound.guesses.map(g => ({ user: g.user, guess: g.guess })),
-                lastSolutionWord
+                user: username,
+                role: username === 'admin' ? 'admin' : 'user',
+                score: 0
             }
-        });
-    });
-}
-
-/**
- * Spieler gibt einen Rateversuch ab.
- */
-export function submitGuessAPI(userAuth, guess) {
-    return new Promise((resolve, reject) => {
-        if (!currentRound || currentRound.status !== 'running') 
-            return reject({ success: false, error: 'Keine laufende Runde.' });
-        if (!isValidWord(guess)) 
-            return reject({ success: false, error: 'Kein gültiges Wort.' });
-        const user = mockUsers.find(u => u.user === userAuth && u.active);
-        if (!user) return reject({ success: false, error: 'Benutzer nicht aktiv.' });
-        
-        // Max. Versuche pro User: 6/3/2 je nach Spielerzahl
-        const playerCount = mockUsers.filter(u => u.active && u.role === 'user').length;
-        let maxTries = 6;
-        if (playerCount === 2) maxTries = 3;
-        if (playerCount >= 3) maxTries = 2;
-        const userGuesses = currentRound.guesses.filter(g => g.user === userAuth);
-        if (userGuesses.length >= maxTries) 
-            return reject({ success: false, error: 'Keine Versuche mehr.' });
-        
-        currentRound.guesses.push({ user: userAuth, guess });
-        resolve({ success: true, message: 'Rateversuch gespeichert.' });
-    });
-}
-
-/**
- * Gibt Rateversuche aller Spieler zurück.
- */
-export function getAllGuessesAPI(userAuth) {
-    return new Promise((resolve, reject) => {
-        if (userAuth) {
-            const user = mockUsers.find(u => u.user === userAuth && u.active);
-            if (!user) return reject({ success: false, error: 'Benutzer nicht authentifiziert.' });
-        }
-        
-        if (!currentRound) return resolve({ success: true, data: [] });
-        resolve({ 
-            success: true, 
-            data: currentRound.guesses.map(g => ({ user: g.user, guess: g.guess })) 
-        });
-    });
-}
-
-/**
- * Runde beenden (Admin).
- */
-export function endRoundAPI(adminUser) {
-    return new Promise((resolve, reject) => {
-        const admin = mockUsers.find(u => u.user === adminUser && u.role === 'admin');
-        if (!admin) return reject({ success: false, error: 'Keine Admin-Rechte.' });
-        if (!currentRound) return reject({ success: false, error: 'Keine laufende Runde.' });
-        currentRound.status = 'ended';
-        currentRound.end = Date.now();
-        resolve({ success: true, message: 'Runde beendet.', data: { solution: currentRound.word } });
-    });
-}
-
-/**
- * Gibt die verbleibende Zeit der Runde zurück (z.B. 60 Sekunden pro Runde).
- */
-export function getRoundCountdownAPI() {
-    return new Promise((resolve) => {
-        if (!currentRound || currentRound.status !== 'running') 
-            return resolve({ success: true, data: { secondsLeft: 0 } });
-        const duration = 60 * 1000; // 60 Sekunden
-        const elapsed = Date.now() - currentRound.start;
-        const secondsLeft = Math.max(0, Math.floor((duration - elapsed) / 1000));
-        resolve({ success: true, data: { secondsLeft } });
-    });
-}
-
-/**
- * Gibt Hilfetexte zurück.
- */
-export function getHelpTextsAPI() {
-    return new Promise((resolve) => {
-        resolve({
-            success: true,
-            data: [
-                { title: 'Spielregeln', text: 'Errate das Wort in möglichst wenigen Versuchen.' },
-                { title: 'Mehrspieler', text: 'Jeder Spieler hat je nach Spielerzahl unterschiedlich viele Versuche.' },
-                { title: 'Admin', text: 'Admins können User und Wörter verwalten.' }
-            ]
-        });
-    });
-}
-
-// --- Highscore ---
-
-/**
- * Simulates fetching the highscore list.
- * @returns {Promise<Array<object>>} A promise that resolves with the highscore list.
- */
-export function getHighscoresAPI() {
-    return new Promise((resolve) => {
-        const highscores = mockUsers
-            .sort((a, b) => b.score - a.score)
-            .map((user, index) => ({
-                rank: index + 1,
-                name: user.user,
-                score: user.score,
-                date: '2024-05-20' // Mock date
-            }));
-        resolve({ success: true, data: highscores });
-    });
-}
-
-/**
- * Simulates fetching a new solution word for the game.
- * @returns {Promise<string>} A promise that resolves with the solution word.
- */
-export function getNewSolutionWordAPI() {
-    return new Promise((resolve) => {
-        const random = wordList[Math.floor(Math.random() * wordList.length)];
-        solutionWord = random.word;
-        resolve({ success: true, data: { word: solutionWord } });
-    });
-}
-
-/**
- * --- Passwort ändern ---
- */
-export function changePasswordAPI(userAuth, oldPassword, newPassword) {
-    if (USE_MOCK) {
-        return new Promise((resolve, reject) => {
-            const user = mockUsers.find(u => u.user === userAuth && u.active);
-            if (!user) return reject({ success: false, error: 'Benutzer nicht gefunden.' });
-            if (user.password !== hashPassword(oldPassword) && user.password !== oldPassword)
-                return reject({ success: false, error: 'Altes Passwort falsch.' });
-            if (!isValidPassword(newPassword)) return reject({ success: false, error: 'Neues Passwort zu kurz (min. 3 Zeichen).' });
-            user.password = hashPassword(newPassword);
-            resolve({ success: true, message: 'Passwort geändert.' });
-        });
-    } else {
-        // Backend erwartet nur username und neues password
-        return fetch(`${API_BASE_URL}/user/passwordChange`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ username: userAuth, password: newPassword })
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Passwort ändern fehlgeschlagen (HTTP ${response.status})`);
-            }
-            return response.json(); // boolean
-        })
-        .then(success => {
-            if (success) {
-                return { success: true, message: 'Passwort erfolgreich geändert' };
-            } else {
-                throw new Error('Passwort ändern fehlgeschlagen');
-            }
-        })
-        .catch(error => {
-            throw { success: false, error: error.message };
-        });
+        };
+    } catch (error) {
+        throw {
+            success: false,
+            error: error.message || 'Ungültige Anmeldedaten'
+        };
     }
 }
 
 /**
- * --- Wort ändern ---
+ * Highscore-Liste abrufen
+ * @returns {Promise<object>}
  */
-export function updateWordAPI(adminUser, wordId, newWord) {
-    return new Promise((resolve, reject) => {
-        const admin = mockUsers.find(u => u.user === adminUser && u.role === 'admin');
-        if (!admin) return reject({ success: false, error: 'Keine Admin-Rechte.' });
-        const wordObj = getWordById(wordId);
-        if (!wordObj) return reject({ success: false, error: 'Wort nicht gefunden.' });
-        if (!newWord || newWord.length !== 5) return reject({ success: false, error: 'Wort muss genau 5 Buchstaben haben.' });
-        if (wordList.some(w => w.word === newWord.toLowerCase() && w.id !== wordId))
-            return reject({ success: false, error: 'Wort existiert bereits.' });
-        wordObj.word = newWord.toLowerCase();
-        resolve({ success: true, message: 'Wort geändert.' });
+export async function getHighscoresAPI() {
+    try {
+        const result = await apiCall('/highscores', 'GET');
+        const formattedHighscores = result.data.map((entry, index) => ({
+            rank: index + 1,
+            name: entry.username,
+            score: entry.score,
+            date: '2024-05-20'
+        }));
+        
+        return {
+            success: true,
+            data: formattedHighscores
+        };
+    } catch (error) {
+        throw error;
+    }
+}
+
+/**
+ * Wortliste abrufen (für Admins)
+ * @param {string} adminUser - Username des Admins
+ * @returns {Promise<object>}
+ */
+export async function getWordsAPI(adminUser) {
+    try {
+        const result = await apiCall('/words', 'GET');
+        const formattedWords = result.data.map(entry => ({
+            id: entry.wordid.toString(),
+            word: entry.word
+        }));
+        
+        return {
+            success: true,
+            data: formattedWords
+        };
+    } catch (error) {
+        throw error;
+    }
+}
+
+/**
+ * Wort hinzufügen (Admin-Funktion)
+ * @param {string} adminUser - Username des Admins
+ * @param {string} word - Das hinzuzufügende Wort
+ * @returns {Promise<object>}
+ */
+export async function addWordAPI(adminUser, word) {
+    if (!word || word.length !== 5) {
+        throw { success: false, error: 'Wort muss genau 5 Buchstaben haben.' };
+    }
+    
+    try {
+        const result = await apiCall('/words/addWord', 'POST', { word });
+        return {
+            success: true,
+            message: 'Wort hinzugefügt.'
+        };
+    } catch (error) {
+        throw error;
+    }
+}
+
+/**
+ * Admin: User freischalten
+ * @param {string} adminUser - Username des Admins
+ * @param {string} targetUser - Username des freizuschaltenden Users
+ * @param {boolean} active - true = freischalten, false wird ignoriert (nutze deleteUserAPI)
+ * @returns {Promise<object>}
+ */
+export async function setUserActiveAPI(adminUser, targetUser, active) {
+    if (!active) {
+        return deleteUserAPI(adminUser, targetUser);
+    }
+    
+    try {
+        const result = await apiCall('/user/unlockUser', 'PUT', { username: targetUser });
+        return {
+            success: true,
+            message: 'Benutzer freigeschaltet.'
+        };
+    } catch (error) {
+        throw error;
+    }
+}
+
+/**
+ * Admin: User löschen
+ * @param {string} adminUser - Username des Admins
+ * @param {string} targetUser - Username des zu löschenden Users
+ * @returns {Promise<object>}
+ */
+export async function deleteUserAPI(adminUser, targetUser) {
+    try {
+        const result = await apiCall('/user/deleteUser', 'DELETE', { username: targetUser });
+        return {
+            success: true,
+            message: 'Benutzer gelöscht.'
+        };
+    } catch (error) {
+        throw error;
+    }
+}
+
+/**
+ * Passwort ändern
+ * @param {string} username - Username
+ * @param {string} oldPassword - Altes Passwort (wird ignoriert, da Backend es nicht braucht)
+ * @param {string} newPassword - Neues Passwort
+ * @returns {Promise<object>}
+ */
+export async function changePasswordAPI(username, oldPassword, newPassword) {
+    if (!isValidPassword(newPassword)) {
+        throw { success: false, error: 'Neues Passwort zu kurz (min. 3 Zeichen).' };
+    }
+    
+    try {
+        const result = await apiCall('/user/passwordChange', 'PUT', { 
+            username, 
+            password: newPassword 
+        });
+        return {
+            success: true,
+            message: 'Passwort erfolgreich geändert.'
+        };
+    } catch (error) {
+        throw error;
+    }
+}
+
+/**
+ * User-Details abrufen (für Admin-Panel)
+ * @param {number} userID - User ID
+ * @returns {Promise<object>}
+ */
+export async function getUserAPI(userID) {
+    try {
+        const result = await apiCall(`/user?userID=${userID}`, 'GET');
+        const formattedUser = {
+            id: result.data.userID.toString(),
+            user: result.data.username,
+            role: result.data.role,
+            active: result.data.status === 'unlocked'
+        };
+        
+        return {
+            success: true,
+            data: formattedUser
+        };
+    } catch (error) {
+        throw error;
+    }
+}
+
+/**
+ * Neues Lösungswort aus der Backend-Wortliste abrufen
+ * @returns {Promise<object>}
+ */
+export async function getNewSolutionWordAPI() {
+    try {
+        const wordsResult = await getWordsAPI();
+        const words = wordsResult.data;
+        
+        if (words.length === 0) {
+            throw new Error('Keine Wörter in der Datenbank verfügbar');
+        }
+        
+        const randomWord = words[Math.floor(Math.random() * words.length)];
+        
+        return {
+            success: true,
+            data: { word: randomWord.word }
+        };
+    } catch (error) {
+        throw error;
+    }
+}
+
+// === RUNDENVERWALTUNG-APIs ===
+
+/**
+ * Neue Runde starten (Admin)
+ * @param {string} adminUser - Username des Admins
+ * @returns {Promise<object>}
+ */
+export async function startRoundAPI(adminUser) {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve({
+                success: true,
+                data: {
+                    roundId: Date.now(),
+                    wordLength: 5,
+                    maxGuesses: 6,
+                    timeLimit: 300
+                },
+                message: 'Neue Runde gestartet'
+            });
+        }, 500);
     });
 }
 
 /**
- * --- Logout (Mock, macht nichts) ---
+ * Aktuelle Runde abfragen
+ * @returns {Promise<object>}
  */
-export function logoutAPI() {
+export async function getCurrentRoundAPI() {
     return new Promise((resolve) => {
-        resolve({ success: true, message: 'Logout erfolgreich.' });
+        setTimeout(() => {
+            resolve({
+                success: true,
+                data: {
+                    roundId: 123456,
+                    status: 'active',
+                    startTime: Date.now() - 60000,
+                    endTime: null,
+                    wordLength: 5,
+                    maxGuesses: 6,
+                    timeLimit: 300
+                }
+            });
+        }, 200);
+    });
+}
+
+/**
+ * Rateversuch abgeben
+ * @param {string} guess - Der Rateversuch
+ * @returns {Promise<object>}
+ */
+export async function submitGuessAPI(guess) {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            if (guess.length !== 5) {
+                reject({ success: false, error: 'Rateversuch muss 5 Buchstaben haben' });
+                return;
+            }
+            resolve({
+                success: true,
+                data: {
+                    guess: guess,
+                    timestamp: Date.now(),
+                    valid: true
+                },
+                message: 'Rateversuch gespeichert'
+            });
+        }, 300);
+    });
+}
+
+/**
+ * Alle Rateversuche der aktuellen Runde abrufen
+ * @returns {Promise<object>}
+ */
+export async function getAllGuessesAPI() {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve({
+                success: true,
+                data: [
+                    { user: 'player1', guess: 'hallo', timestamp: Date.now() - 120000 },
+                    { user: 'player2', guess: 'welt', timestamp: Date.now() - 90000 }
+                ]
+            });
+        }, 200);
+    });
+}
+
+/**
+ * Runde beenden (Admin)
+ * @param {string} adminUser - Username des Admins
+ * @returns {Promise<object>}
+ */
+export async function endRoundAPI(adminUser) {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve({
+                success: true,
+                data: {
+                    roundId: 123456,
+                    solution: 'LÖSUNG',
+                    endTime: Date.now(),
+                    winners: ['player1', 'player2']
+                },
+                message: 'Runde beendet'
+            });
+        }, 500);
+    });
+}
+
+// === BENUTZERVERWALTUNG-APIs ===
+
+/**
+ * User-Liste abrufen (Admin)
+ * @param {string} adminUser - Username des Admins
+ * @returns {Promise<object>}
+ */
+export async function getUsersAPI(adminUser) {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve({
+                success: true,
+                data: [
+                    { id: '1', user: 'pendingUser1', role: 'user', active: false, email: 'user1@test.com' },
+                    { id: '2', user: 'pendingUser2', role: 'user', active: false, email: 'user2@test.com' },
+                    { id: '3', user: 'activeUser1', role: 'user', active: true, email: 'active@test.com' }
+                ]
+            });
+        }, 300);
+    });
+}
+
+/**
+ * User anlegen (Admin)
+ * @param {string} adminUser - Username des Admins
+ * @param {object} userData - User-Daten
+ * @returns {Promise<object>}
+ */
+export async function createUserAPI(adminUser, userData) {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            if (!userData.username || !userData.password) {
+                reject({ success: false, error: 'Username und Passwort erforderlich' });
+                return;
+            }
+            resolve({
+                success: true,
+                data: { id: Date.now(), username: userData.username },
+                message: 'User erfolgreich erstellt'
+            });
+        }, 500);
+    });
+}
+
+/**
+ * User bearbeiten (Admin)
+ * @param {string} adminUser - Username des Admins
+ * @param {string} targetUser - Username des zu bearbeitenden Users
+ * @param {object} updates - Zu aktualisierende Daten
+ * @returns {Promise<object>}
+ */
+export async function updateUserAPI(adminUser, targetUser, updates) {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve({
+                success: true,
+                message: 'User erfolgreich aktualisiert'
+            });
+        }, 400);
+    });
+}
+
+// === WORTLISTE-APIs ===
+
+/**
+ * Wort löschen (Admin)
+ * @param {string} adminUser - Username des Admins
+ * @param {string} wordId - ID des zu löschenden Worts
+ * @returns {Promise<object>}
+ */
+export async function deleteWordAPI(adminUser, wordId) {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve({
+                success: true,
+                message: 'Wort erfolgreich gelöscht'
+            });
+        }, 400);
+    });
+}
+
+/**
+ * Wort bearbeiten (Admin)
+ * @param {string} adminUser - Username des Admins
+ * @param {string} wordId - ID des zu bearbeitenden Worts
+ * @param {string} newWord - Das neue Wort
+ * @returns {Promise<object>}
+ */
+export async function updateWordAPI(adminUser, wordId, newWord) {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            if (!newWord || newWord.length !== 5) {
+                reject({ success: false, error: 'Wort muss genau 5 Buchstaben haben' });
+                return;
+            }
+            resolve({
+                success: true,
+                message: 'Wort erfolgreich aktualisiert'
+            });
+        }, 400);
     });
 }

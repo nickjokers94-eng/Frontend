@@ -177,6 +177,48 @@ button:hover {
   color: #3a3a3c;
 }
 
+/* --- Neue Styles für Lastenheft-Features --- */
+.last-word {
+  font-size: 24px;
+  font-weight: bold;
+  color: #6aaa64;
+  text-align: center;
+  padding: 15px;
+  background: #f0f8f0;
+  border-radius: 6px;
+}
+
+.no-last-word {
+  font-style: italic;
+  color: #878a8c;
+  text-align: center;
+  padding: 15px;
+}
+
+.player-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  margin-bottom: 5px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #d3d6da;
+}
+
+.player-status .username {
+  font-weight: bold;
+  color: #333;
+}
+
+.player-status .attempts {
+  font-size: 12px;
+  color: #6c757d;
+  background: #f8f9fa;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
 /* --- Game Grid (Wordle Tiles) --- */
 .game-center {
   max-width: 600px; /* Tastatur und Gitter weiter verbreitert */

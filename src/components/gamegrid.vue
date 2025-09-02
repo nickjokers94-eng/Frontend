@@ -10,11 +10,9 @@ const props = defineProps({
 const GUESS_LENGTH = 5
 const MAX_GUESSES = 6
 
-// Creates a 2D array of tiles for display
 const tiles = computed(() => {
   let allTiles = []
 
-  // Fill tiles for submitted guesses
   props.guesses.forEach((guess) => {
     const row = []
     const solutionLetters = props.solution.split('')
@@ -22,22 +20,20 @@ const tiles = computed(() => {
     const tempSolution = [...solutionLetters]
     const statuses = Array(GUESS_LENGTH).fill('wrong')
 
-    // 1st pass: find correct letters (green)
     for (let i = 0; i < GUESS_LENGTH; i++) {
       if (guessLetters[i] === tempSolution[i]) {
         statuses[i] = 'correct'
-        tempSolution[i] = null // Mark as used
+        tempSolution[i] = null
       }
     }
 
-    // 2nd pass: find present letters (yellow)
     for (let i = 0; i < GUESS_LENGTH; i++) {
       if (statuses[i] === 'correct') continue
 
       const letterIndexInSolution = tempSolution.indexOf(guessLetters[i])
       if (letterIndexInSolution !== -1) {
         statuses[i] = 'present'
-        tempSolution[letterIndexInSolution] = null // Mark as used
+        tempSolution[letterIndexInSolution] = null
       }
     }
 
@@ -47,7 +43,6 @@ const tiles = computed(() => {
     allTiles.push(row)
   })
 
-  // Add the current, incomplete row
   if (allTiles.length < MAX_GUESSES) {
     let currentRow = []
     for (let i = 0; i < GUESS_LENGTH; i++) {
@@ -56,7 +51,6 @@ const tiles = computed(() => {
     allTiles.push(currentRow)
   }
 
-  // Fill the rest with empty rows
   while (allTiles.length < MAX_GUESSES) {
     let emptyRow = []
     for (let i = 0; i < GUESS_LENGTH; i++) {

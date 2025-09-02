@@ -1,32 +1,43 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { getHighscoresAPI, getUsersAPI, setUserActiveAPI, deleteUserAPI } from './api.js'
+import { getHighscoresAPI, setUserActiveAPI, deleteUserAPI, changePasswordAPI, getUsersAPI, startRoundAPI, endRoundAPI } from './api.js'
 import GameScreen from './components/gamescreen.vue'
 import StartScreen from './components/startscreen.vue'
 
-// --- State Management ---
+// --- Zustandsverwaltung ---
 const activeScreen = ref('start') // 'start', 'game', 'change-password', 'admin'
 const currentUser = ref(null)
 
-// Highscore Modal State
+// Highscore-Modal-Zustand
 const showHighscoreModal = ref(false)
 const highscores = ref([])
 
-// Admin State
+// Admin-Zustand
 const pendingUsers = ref([]) // Benutzer die auf Freischaltung warten
 const selectedUsers = ref([]) // Ausgewählte Benutzer für Freischaltung/Löschung
 const adminMessage = ref('')
 const adminError = ref('')
 
-// --- Methods ---
+// Passwort-Ändern-Zustand
+const oldPassword = ref('')
+const newPassword = ref('')
+const confirmPassword = ref('')
+const passwordMessage = ref('')
+const passwordError = ref('')
+
+// --- Methoden ---
 
 function handleLoginSuccess(userData) {
-  currentUser.value = userData.data // userData.data enthält jetzt die Benutzerdaten
+  currentUser.value = userData.data
+  localStorage.setItem('currentUser', JSON.stringify({
+    username: userData.data.user,
+  }))
   activeScreen.value = 'game'
 }
 
 function handleLogout() {
   currentUser.value = null
+  localStorage.removeItem('currentUser')
   activeScreen.value = 'start'
 }
 
@@ -44,7 +55,6 @@ async function loadPendingUsers() {
   if (!currentUser.value || currentUser.value.role !== 'admin') return
   try {
     const response = await getUsersAPI(currentUser.value.user)
-    // Nur inaktive Benutzer anzeigen (warten auf Freischaltung)
     pendingUsers.value = response.data.filter(user => !user.active)
     adminError.value = ''
   } catch (err) {
@@ -107,12 +117,42 @@ function openAdminPanel() {
   loadPendingUsers()
 }
 
-// Computed property to check if a user is logged in
+async function changePassword() {
+  passwordError.value = ''
+  passwordMessage.value = ''
+  
+  if (!oldPassword.value || !newPassword.value || !confirmPassword.value) {
+    passwordError.value = 'Bitte alle Felder ausfüllen'
+    return
+  }
+  
+  if (newPassword.value !== confirmPassword.value) {
+    passwordError.value = 'Neue Passwörter stimmen nicht überein'
+    return
+  }
+  
+  if (newPassword.value.length < 3) {
+    passwordError.value = 'Neues Passwort muss mindestens 3 Zeichen haben'
+    return
+  }
+  
+  try {
+    await changePasswordAPI(currentUser.value.user, oldPassword.value, newPassword.value)
+    passwordMessage.value = 'Passwort erfolgreich geändert'
+    oldPassword.value = ''
+    newPassword.value = ''
+    confirmPassword.value = ''
+  } catch (err) {
+    passwordError.value = err.error || 'Fehler beim Ändern des Passworts'
+  }
+}
+
+// Computed-Eigenschaft zur Überprüfung ob ein Benutzer angemeldet ist
 const isLoggedIn = computed(() => activeScreen.value !== 'start')
 </script>
 
 <template>
-  <!-- Fixed Logo, visible on all screens except start -->
+  <!-- Festes Logo, sichtbar auf allen Bildschirmen außer Start -->
   <img
     v-if="isLoggedIn"
     src="https://media.discordapp.net/attachments/903679816035876914/1410239792569909280/Design_ohne_Titel.png?ex=68b04ba7&is=68aefa27&hm=4e90d176d93cd71ef858cd493d48e66e3d3c0515acb7076f4f7d8cc2a60ceca2&=&format=webp&quality=lossless&width=625&height=625"
@@ -120,48 +160,51 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
     class="header-logo"
   />
 
-  <!-- Start Screen -->
+    <!-- Start-Bildschirm -->
   <StartScreen 
-    v-if="activeScreen === 'start'" 
+    v-if="activeScreen === 'start'"
     @login-successful="handleLoginSuccess"
   />
 
-  <!-- Game Screen -->
+  <!-- Spiel-Bildschirm -->
   <GameScreen
     v-if="activeScreen === 'game'"
     :user="currentUser"
     @logout="handleLogout"
     @show-highscore="openHighscore"
-    @show-change-password="activeScreen = 'change-password'"
+    @show-change-password="() => activeScreen = 'change-password'"
     @show-admin="openAdminPanel"
   />
 
-  <!-- Change Password Screen -->
+  <!-- Passwort-Ändern-Bildschirm -->
+    <!-- Passwort-Ändern-Bildschirm -->
   <section v-if="activeScreen === 'change-password'" class="screen">
     <h1>Passwort ändern</h1>
-    <form id="change-password-form" class="login-form">
-      <div class="form-group">
-        <label for="change-username">Benutzername</label>
-        <input type="text" id="change-username" :value="currentUser.username" disabled />
-      </div>
+    <form id="change-password-form" class="login-form" @submit.prevent="changePassword">
       <div class="form-group">
         <label for="old-password">Altes Passwort</label>
-        <input type="password" id="old-password" required />
+        <input type="password" id="old-password" v-model="oldPassword" required>
       </div>
       <div class="form-group">
         <label for="new-password">Neues Passwort</label>
-        <input type="password" id="new-password" required />
+        <input type="password" id="new-password" v-model="newPassword" required>
       </div>
       <div class="form-group">
         <label for="confirm-password">Neues Passwort bestätigen</label>
-        <input type="password" id="confirm-password" required />
+        <input type="password" id="confirm-password" v-model="confirmPassword" required>
+      </div>
+      <div v-if="passwordError" class="form-group">
+        <p style="color: red;">{{ passwordError }}</p>
+      </div>
+      <div v-if="passwordMessage" class="form-group">
+        <p style="color: green;">{{ passwordMessage }}</p>
       </div>
       <button type="submit">Speichern</button>
       <button type="button" @click="activeScreen = 'game'">Abbrechen</button>
     </form>
   </section>
 
-  <!-- Admin Screen -->
+  <!-- Admin-Bildschirm -->
   <section v-if="activeScreen === 'admin'" class="screen">
     <header>
       <button @click="activateSelectedUsers" :disabled="selectedUsers.length === 0">Freischalten</button>
@@ -189,7 +232,7 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
               <input 
                 type="checkbox" 
                 :checked="selectedUsers.some(u => u.id === user.id)"
-                @click.stop="toggleUserSelection(user)"
+                @click.stop
               />
               <span class="username">{{ user.user }}</span>
               <span class="user-info">(Rolle: {{ user.role }})</span>
@@ -205,11 +248,10 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
     <button class="close-btn" @click="activeScreen = 'game'">ADMIN BEREICH SCHLIESSEN</button>
   </section>
 
-  <!-- Highscore Modal -->
+  <!-- Highscore-Modal -->
   <div v-if="showHighscoreModal" class="modal">
     <div class="modal-content">
-      <span class="close-btn" @click="closeHighscore">&times;</span>
-      <h2>Highscore</h2>
+      <h2>Highscores</h2>
       <table id="highscore-table">
         <thead>
           <tr>
@@ -220,11 +262,8 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
           </tr>
         </thead>
         <tbody>
-          <tr
-            v-for="score in highscores"
-            :key="score.rank"
-            :class="{ 'current-player': score.name === currentUser.username }"
-          >
+          <tr v-for="score in highscores" :key="score.rank" 
+              :class="{ 'current-player': score.name === currentUser?.user }">
             <td>{{ score.rank }}</td>
             <td>{{ score.name }}</td>
             <td>{{ score.score }}</td>
@@ -232,6 +271,7 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
           </tr>
         </tbody>
       </table>
+      <button class="close-btn" @click="closeHighscore">Schließen</button>
     </div>
   </div>
 </template>
