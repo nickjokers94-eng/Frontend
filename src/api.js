@@ -1,4 +1,4 @@
-// src/api.js - Echte Backend-Integration
+// src/api.js - Korrigierte Backend-Integration
 
 // API-Konfiguration für Backend-Integration
 const API_BASE_URL = 'http://localhost:8080'; // Spring Boot Standard-Port
@@ -24,12 +24,10 @@ async function apiCall(endpoint, method = 'GET', data = null, requiresAuth = tru
     credentials: 'include'
   };
   
-  // Auth nur hinzufügen wenn erforderlich
   if (requiresAuth) {
     config.headers['Authorization'] = 'Basic ' + btoa(SPRING_SECURITY_USER + ':' + SPRING_SECURITY_PASSWORD);
   }
   
-  // Content-Type und Body
   if (data && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
     config.headers['Content-Type'] = 'application/x-www-form-urlencoded';
     config.body = new URLSearchParams(data);
@@ -78,7 +76,6 @@ export async function registerAPI(username, password) {
     }
 
     try {
-        // requiresAuth = false für Registrierung!
         const result = await apiCall('/user/register', 'POST', { username, password }, false);
         return {
             success: true,
@@ -90,34 +87,20 @@ export async function registerAPI(username, password) {
 }
 
 /**
- * Benutzer-Login
+ * Benutzer-Login - Korrigiert für echtes Backend
  * @param {string} username
  * @param {string} password
  * @returns {Promise<object>}
  */
 export async function loginAPI(username, password) {
     try {
-        const testResponse = await fetch(`${API_BASE_URL}/highscores`, {
-            method: 'GET',
-            headers: {
-                'Authorization': 'Basic ' + btoa(SPRING_SECURITY_USER + ':' + SPRING_SECURITY_PASSWORD),
-                'Content-Type': 'application/json'
-            }
-        });
-
-        if (!testResponse.ok) {
-            if (testResponse.status === 401) {
-                throw new Error('Ungültige Anmeldedaten');
-            }
-            throw new Error('Anmeldung fehlgeschlagen');
-        }
-
-        // Erfolgreiche Authentifizierung - User-Objekt erstellen
+        const result = await apiCall('/user/login', 'POST', { username, password });
+        
         return {
             success: true,
             data: {
                 user: username,
-                role: username === 'admin' ? 'admin' : 'user',
+                role: result.data.role || 'user',
                 score: 0
             }
         };
@@ -129,14 +112,15 @@ export async function loginAPI(username, password) {
     }
 }
 
+
 export async function getHighscoresAPI() {
     try {
-        const result = await apiCall('/api/highscore', 'GET');
+        const result = await apiCall('/highscores', 'GET');
         const formattedHighscores = result.data.map((entry, index) => ({
             rank: index + 1,
             name: entry.username,
             score: entry.score,
-            date: entry.timestamp
+            date: entry.timestamp || new Date().toISOString()
         }));
         
         return {
@@ -150,9 +134,9 @@ export async function getHighscoresAPI() {
 
 export async function getWordsAPI() {
     try {
-        const result = await apiCall('/api/words', 'GET');
+        const result = await apiCall('/words', 'GET');
         const formattedWords = result.data.map(entry => ({
-            id: entry.id.toString(),
+            id: entry.wordid ? entry.wordid.toString() : entry.id?.toString() || Math.random().toString(),
             word: entry.word
         }));
         
@@ -171,56 +155,10 @@ export async function addWordAPI(word) {
     }
     
     try {
-        const result = await apiCall('/api/words', 'POST', { word });
+        const result = await apiCall('/words/addWord', 'POST', { word });
         return {
             success: true,
             message: 'Wort hinzugefügt.'
-        };
-    } catch (error) {
-        throw error;
-    }
-}
-
-export async function submitGuessAPI(guess) {
-    try {
-        const result = await apiCall('/api/guess', 'POST', { word: guess });
-        return {
-            success: true,
-            data: {
-                guess: guess,
-                timestamp: Date.now(),
-                valid: true
-            },
-            message: 'Rateversuch gespeichert'
-        };
-    } catch (error) {
-        throw error;
-    }
-}
-
-export async function getUsersAPI() {
-    try {
-        const result = await apiCall('/api/users', 'GET');
-        return {
-            success: true,
-            data: result.data.map(user => ({
-                id: user.id.toString(),
-                user: user.username,
-                role: user.role,
-                active: user.status === 'ACTIVE'
-            }))
-        };
-    } catch (error) {
-        throw error;
-    }
-}
-
-export async function deleteUserAPI(targetUser) {
-    try {
-        const result = await apiCall(`/api/users/${targetUser}`, 'DELETE');
-        return {
-            success: true,
-            message: 'Benutzer gelöscht.'
         };
     } catch (error) {
         throw error;
@@ -233,14 +171,49 @@ export async function changePasswordAPI(username, oldPassword, newPassword) {
     }
     
     try {
-        const result = await apiCall('/api/users/password', 'PUT', { 
+        const result = await apiCall('/user/passwordChange', 'PUT', { 
             username,
-            oldPassword,
-            newPassword 
+            password: newPassword
         });
         return {
             success: true,
             message: 'Passwort erfolgreich geändert.'
+        };
+    } catch (error) {
+        throw error;
+    }
+}
+
+export async function unlockUserAPI(username) {
+    try {
+        const result = await apiCall('/user/unlockUser', 'PUT', { username });
+        return {
+            success: true,
+            message: 'Benutzer freigeschaltet.'
+        };
+    } catch (error) {
+        throw error;
+    }
+}
+
+export async function deleteUserAPI(targetUser) {
+    try {
+        const result = await apiCall('/user/deleteUser', 'DELETE', { username: targetUser });
+        return {
+            success: true,
+            message: 'Benutzer gelöscht.'
+        };
+    } catch (error) {
+        throw error;
+    }
+}
+
+export async function getUserAPI(userID) {
+    try {
+        const result = await apiCall(`/user?userID=${userID}`, 'GET');
+        return {
+            success: true,
+            data: result.data
         };
     } catch (error) {
         throw error;
