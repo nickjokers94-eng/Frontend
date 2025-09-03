@@ -17,17 +17,21 @@ function isValidPassword(pw) {
 }
 
 // Hilfsfunktion für API-Aufrufe mit HTTP Basic Auth
-async function apiCall(endpoint, method = 'GET', data = null, requiresAuth = false, credentials = null) {
+async function apiCall(endpoint, method = 'GET', data = null, requiresAuth = true) {
   const config = {
     method,
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': 'Basic ' + btoa(SPRING_SECURITY_USER + ':' + SPRING_SECURITY_PASSWORD)
-    },
+    headers: {},
     credentials: 'include'
   };
   
+  // Auth nur hinzufügen wenn erforderlich
+  if (requiresAuth) {
+    config.headers['Authorization'] = 'Basic ' + btoa(SPRING_SECURITY_USER + ':' + SPRING_SECURITY_PASSWORD);
+  }
+  
+  // Content-Type und Body
   if (data && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
+    config.headers['Content-Type'] = 'application/x-www-form-urlencoded';
     config.body = new URLSearchParams(data);
   }
   
@@ -74,8 +78,8 @@ export async function registerAPI(username, password) {
     }
 
     try {
-        // Direkt ohne requiresAuth und credentials Parameter
-        const result = await apiCall('/user/register', 'POST', { username, password });
+        // requiresAuth = false für Registrierung!
+        const result = await apiCall('/user/register', 'POST', { username, password }, false);
         return {
             success: true,
             message: 'Registrierung erfolgreich. Bitte warte auf Admin-Freischaltung.'
