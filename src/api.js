@@ -3,6 +3,10 @@
 // API-Konfiguration für Backend-Integration
 const API_BASE_URL = 'http://localhost:8080'; // Spring Boot Standard-Port
 
+// Standard Spring Security Credentials
+const SPRING_SECURITY_USER = 'user';
+const SPRING_SECURITY_PASSWORD = 'passwordtest';
+
 // --- Hilfsfunktionen ---
 function isValidUsername(username) {
     return /^[a-zA-Z0-9_@.-]+$/.test(username) && username.length >= 3;
@@ -12,20 +16,16 @@ function isValidPassword(pw) {
     return typeof pw === 'string' && pw.length >= 3;
 }
 
-// Hilfsfunktion für API-Aufrufe mit HTTP Basic Auth (da Backend Security konfiguriert ist)
+// Hilfsfunktion für API-Aufrufe mit HTTP Basic Auth
 async function apiCall(endpoint, method = 'GET', data = null, requiresAuth = false, credentials = null) {
   const config = {
     method,
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-    }
+      'Authorization': 'Basic ' + btoa(SPRING_SECURITY_USER + ':' + SPRING_SECURITY_PASSWORD)
+    },
+    credentials: 'include'
   };
-  
-  // HTTP Basic Auth hinzufügen falls nötig
-  if (requiresAuth && credentials) {
-    const authHeader = 'Basic ' + btoa(credentials.username + ':' + credentials.password);
-    config.headers['Authorization'] = authHeader;
-  }
   
   if (data && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
     config.body = new URLSearchParams(data);
@@ -74,6 +74,7 @@ export async function registerAPI(username, password) {
     }
 
     try {
+        // Direkt ohne requiresAuth und credentials Parameter
         const result = await apiCall('/user/register', 'POST', { username, password });
         return {
             success: true,
@@ -95,7 +96,7 @@ export async function loginAPI(username, password) {
         const testResponse = await fetch(`${API_BASE_URL}/highscores`, {
             method: 'GET',
             headers: {
-                'Authorization': 'Basic ' + btoa(username + ':' + password),
+                'Authorization': 'Basic ' + btoa(SPRING_SECURITY_USER + ':' + SPRING_SECURITY_PASSWORD),
                 'Content-Type': 'application/json'
             }
         });
