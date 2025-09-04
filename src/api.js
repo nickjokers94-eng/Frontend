@@ -1,7 +1,7 @@
 // src/api.js - Korrigierte Backend-Integration
 
 // API-Konfiguration für Backend-Integration
-const API_BASE_URL = 'http://localhost:8080'; // Spring Boot Standard-Port
+const API_BASE_URL = 'http://localhost:8080'; 
 
 // Standard Spring Security Credentials
 const SPRING_SECURITY_USER = 'user';
@@ -78,7 +78,6 @@ export async function registerAPI(username, password) {
     }
 
     try {
-        // requiresAuth = false für Registrierung!
         const result = await apiCall('/user/register', 'POST', { username, password }, false);
         return {
             success: true,
@@ -97,7 +96,6 @@ export async function registerAPI(username, password) {
  */
 export async function loginAPI(username, password) {
     try {
-        // Verwende die tatsächlichen Backend-Endpunkte für Login
         const result = await apiCall('/user/login', 'POST', { username, password });
         
         return {
@@ -116,7 +114,6 @@ export async function loginAPI(username, password) {
     }
 }
 
-// Korrigiert: /highscores (nicht /api/highscore)
 export async function getHighscoresAPI() {
     try {
         const result = await apiCall('/highscores', 'GET');
