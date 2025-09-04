@@ -251,7 +251,3 @@ export async function setUserActiveAPI(adminUser, targetUser, active) {
 }
 
 }
-
-export async function endRoundAPI() {
-    return { success: true, message: 'Round ended via WebSocket' };
-}
