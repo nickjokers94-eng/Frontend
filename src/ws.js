@@ -1,4 +1,3 @@
-// src/ws.js - WebSocket Client für Live-Events
 
 let socket = null
 let reconnectAttempts = 0
@@ -111,7 +110,75 @@ function handleIncomingEvent(message) {
 
 // === GAME-SPEZIFISCHE EVENTS ===
 
-// Runde-Events
+// Server -> Client Events (vom Server empfangen)
+export function onWelcome(callback) {
+  onEvent('welcome', callback)
+}
+
+export function onNewRound(callback) {
+  onEvent('newRound', callback)
+}
+
+export function onRoundEnded(callback) {
+  onEvent('roundEnded', callback)
+}
+
+export function onTimer(callback) {
+  onEvent('timer', callback)
+}
+
+export function onGuess(callback) {
+  onEvent('guess', callback)
+}
+
+export function onCorrectGuess(callback) {
+  onEvent('correctGuess', callback)
+}
+
+export function onPlayerList(callback) {
+  onEvent('playerList', callback)
+}
+
+export function onSync(callback) {
+  onEvent('sync', callback)
+}
+
+export function onUserJoined(callback) {
+  onEvent('userJoined', callback)
+}
+
+export function onUserLeft(callback) {
+  onEvent('userLeft', callback)
+}
+
+export function onError(callback) {
+  onEvent('error', callback)
+}
+
+export function onPong(callback) {
+  onEvent('pong', callback)
+}
+
+// Client -> Server Events (zum Server senden)
+export function sendGuess(guess, username) {
+  sendEvent('guess', { guess, user: username })
+}
+
+export function sendPlayerJoin(username) {
+  sendEvent('playerJoin', { user: username })
+}
+
+export function requestSync() {
+  sendEvent('requestSync', {})
+}
+
+export function sendPing() {
+  sendEvent('ping', {})
+}
+
+// === LEGACY FUNKTIONEN (für Rückwärtskompatibilität) ===
+
+// Alte Runde-Events (falls noch verwendet)
 export function sendNewRoundStarted(roundData) {
   sendEvent('roundStarted', roundData)
 }
@@ -124,53 +191,17 @@ export function onRoundStarted(callback) {
   onEvent('roundStarted', callback)
 }
 
-export function onRoundEnded(callback) {
-  onEvent('roundEnded', callback)
-}
-
-// Rateversuche-Events
-export function sendGuess(guess, username) {
-  sendEvent('guess', { guess, user: username, timestamp: Date.now() })
+// Alte Event-Namen als Alias
+export function onTimerUpdate(callback) {
+  onEvent('timer', callback)
 }
 
 export function onGuessSubmitted(callback) {
   onEvent('guess', callback)
 }
 
-// Neue Server-Events hinzufügen
-export function onNewRound(callback) {
-  onEvent('newRound', callback)
-}
-
-export function onPlayerList(callback) {
-  onEvent('playerList', callback)
-}
-
-export function onSync(callback) {
-  onEvent('sync', callback)
-}
-
-export function onError(callback) {
-  onEvent('error', callback)
-}
-
-// Timer-Events
-export function onTimerUpdate(callback) {
-  onEvent('timer', callback)
-}
-
-// Benutzer-Events
-export function onUserJoined(callback) {
-  onEvent('userJoined', callback)
-}
-
-export function onUserLeft(callback) {
-  onEvent('userLeft', callback)
-}
-
-// Spielstatus-Events
 export function onGameStateUpdate(callback) {
-  onEvent('gameStateUpdate', callback)
+  onEvent('sync', callback)
 }
 
 // === HILFSFUNKTIONEN ===
@@ -191,7 +222,7 @@ export function getConnectionState() {
   }
 }
 
-// Legacy-Funktionen für Rückwärtskompatibilität
+// Legacy-Funktionen
 export function sendMessage(msg) {
   if (typeof msg === 'string') {
     sendEvent('message', { text: msg })
