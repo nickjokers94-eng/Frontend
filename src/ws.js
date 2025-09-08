@@ -1,4 +1,4 @@
-// src/ws.js - WebSocket Client für Live-Events
+// WebSocket Client für Game Server
 
 let socket = null
 let reconnectAttempts = 0
@@ -51,7 +51,7 @@ function attemptReconnect(url, username) {
     console.log(`Reconnect-Versuch ${reconnectAttempts}/${maxReconnectAttempts}`)
     setTimeout(() => {
       connectWebSocket(url, username)
-    }, 3000 * reconnectAttempts) // Exponentieller Backoff
+    }, 3000 * reconnectAttempts)
   }
 }
 
@@ -109,37 +109,31 @@ function handleIncomingEvent(message) {
   }
 }
 
-// === GAME-SPEZIFISCHE EVENTS ===
+// === GAME-SPEZIFISCHE EVENTS (passend zu deinem Server) ===
 
-// Runde-Events
-export function sendNewRoundStarted(roundData) {
-  sendEvent('roundStarted', roundData)
+// Server -> Client Events (Events die dein Server sendet)
+export function onWelcome(callback) {
+  onEvent('welcome', callback)
 }
 
-export function sendRoundEnded(roundData) {
-  sendEvent('roundEnded', roundData)
-}
-
-export function onRoundStarted(callback) {
-  onEvent('roundStarted', callback)
+export function onNewRound(callback) {
+  onEvent('newRound', callback)
 }
 
 export function onRoundEnded(callback) {
   onEvent('roundEnded', callback)
 }
 
-// Rateversuche-Events
-export function sendGuess(guess, username) {
-  sendEvent('guess', { guess, user: username, timestamp: Date.now() })
+export function onTimer(callback) {
+  onEvent('timer', callback)
 }
 
-export function onGuessSubmitted(callback) {
+export function onGuess(callback) {
   onEvent('guess', callback)
 }
 
-// Neue Server-Events hinzufügen
-export function onNewRound(callback) {
-  onEvent('newRound', callback)
+export function onCorrectGuess(callback) {
+  onEvent('correctGuess', callback)
 }
 
 export function onPlayerList(callback) {
@@ -150,16 +144,6 @@ export function onSync(callback) {
   onEvent('sync', callback)
 }
 
-export function onError(callback) {
-  onEvent('error', callback)
-}
-
-// Timer-Events
-export function onTimerUpdate(callback) {
-  onEvent('timer', callback)
-}
-
-// Benutzer-Events
 export function onUserJoined(callback) {
   onEvent('userJoined', callback)
 }
@@ -168,9 +152,69 @@ export function onUserLeft(callback) {
   onEvent('userLeft', callback)
 }
 
-// Spielstatus-Events
+export function onError(callback) {
+  onEvent('error', callback)
+}
+
+export function onPong(callback) {
+  onEvent('pong', callback)
+}
+
+// Client -> Server Events (Events die dein Server erwartet)
+export function sendGuess(guess, username) {
+  sendEvent('guess', { guess, user: username })
+}
+
+export function sendPlayerJoin(username) {
+  sendEvent('playerJoin', { user: username })
+}
+
+export function requestSync() {
+  sendEvent('requestSync', {})
+}
+
+export function sendPing() {
+  sendEvent('ping', {})
+}
+
+// === ZUSÄTZLICHE FUNKTIONEN FÜR DEINEN SERVER ===
+
+// Spezielle Funktionen basierend auf deinem Server-Code
+export function getGameState() {
+  requestSync()
+}
+
 export function onGameStateUpdate(callback) {
-  onEvent('gameStateUpdate', callback)
+  onEvent('sync', callback)
+}
+
+// Timer-spezifische Funktionen
+export function onTimerUpdate(callback) {
+  onEvent('timer', (data) => {
+    // Dein Server sendet 'secondsLeft' statt 'timeRemaining'
+    callback({
+      ...data,
+      timeRemaining: data.secondsLeft || data.timeRemaining
+    })
+  })
+}
+
+// Runden-spezifische Funktionen
+export function onRoundStarted(callback) {
+  onEvent('newRound', callback)
+}
+
+export function onGuessSubmitted(callback) {
+  onEvent('guess', callback)
+}
+
+// Player-Management
+export function onPlayerJoined(callback) {
+  onEvent('userJoined', callback)
+}
+
+export function onPlayerLeft(callback) {
+  onEvent('userLeft', callback)
 }
 
 // === HILFSFUNKTIONEN ===
@@ -191,7 +235,7 @@ export function getConnectionState() {
   }
 }
 
-// Legacy-Funktionen für Rückwärtskompatibilität
+// Legacy-Funktionen für Kompatibilität
 export function sendMessage(msg) {
   if (typeof msg === 'string') {
     sendEvent('message', { text: msg })
@@ -204,4 +248,15 @@ export function onMessage(callback) {
   onEvent('message', (data) => {
     callback(JSON.stringify(data))
   })
+}
+
+// === DEBUG-FUNKTIONEN ===
+
+export function debugEventListeners() {
+  console.log('Registrierte Event-Listener:', Array.from(eventListeners.keys()))
+}
+
+export function debugConnection() {
+  console.log('WebSocket Status:', getConnectionState())
+  console.log('Reconnect Attempts:', reconnectAttempts)
 }

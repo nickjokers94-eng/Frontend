@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { getHighscoresAPI, setUserActiveAPI, deleteUserAPI, changePasswordAPI, getUsersAPI, startRoundAPI, endRoundAPI } from './api.js'
+import { getHighscoresAPI, setUserActiveAPI, deleteUserAPI, changePasswordAPI, getUsersAPI} from './api.js'
 import GameScreen from './components/gamescreen.vue'
 import StartScreen from './components/startscreen.vue'
 

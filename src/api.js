@@ -24,8 +24,8 @@ async function apiCall(endpoint, method = 'GET', data = null, requiresAuth = tru
     credentials: 'include'
   };
   
-  // Auth nur hinzufügen wenn erforderlich
-  if (requiresAuth) {
+  // Auth NUR hinzufügen wenn explizit erforderlich
+  if (requiresAuth === true) {
     config.headers['Authorization'] = 'Basic ' + btoa(SPRING_SECURITY_USER + ':' + SPRING_SECURITY_PASSWORD);
   }
   
@@ -38,12 +38,19 @@ async function apiCall(endpoint, method = 'GET', data = null, requiresAuth = tru
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
     
+    // Detailliertere Fehlerbehandlung
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`API-Fehler ${response.status}:`, errorText);
+      
       if (response.status === 401) {
         throw new Error('Ungültige Anmeldedaten');
       }
       if (response.status === 403) {
-        throw new Error('Keine Berechtigung');
+        throw new Error('Zugriff verweigert - Keine Berechtigung');
+      }
+      if (response.status === 404) {
+        throw new Error('Endpoint nicht gefunden');
       }
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
@@ -54,6 +61,7 @@ async function apiCall(endpoint, method = 'GET', data = null, requiresAuth = tru
       data: result
     };
   } catch (error) {
+    console.error('API-Call Fehler:', error);
     throw {
       success: false,
       error: error.message
@@ -78,6 +86,7 @@ export async function registerAPI(username, password) {
     }
 
     try {
+        // requiresAuth explizit auf false setzen
         const result = await apiCall('/user/register', 'POST', { username, password }, false);
         return {
             success: true,
@@ -89,27 +98,35 @@ export async function registerAPI(username, password) {
 }
 
 /**
- * Benutzer-Login - Korrigiert für echtes Backend
+ * Benutzer-Login - Nur API-Call, kein WebSocket
  * @param {string} username
  * @param {string} password
  * @returns {Promise<object>}
  */
 export async function loginAPI(username, password) {
+    if (!isValidUsername(username)) {
+        throw { success: false, error: 'Ungültiger Benutzername.' };
+    }
+    if (!isValidPassword(password)) {
+        throw { success: false, error: 'Ungültiges Passwort.' };
+    }
+
     try {
-        const result = await apiCall('/user/login', 'POST', { username, password });
+        // requiresAuth explizit auf false setzen
+        const result = await apiCall('/user/login', 'POST', { username, password }, false);
         
         return {
             success: true,
             data: {
                 user: username,
                 role: result.data.role || 'user',
-                score: 0
+                score: result.data.score || 0
             }
         };
     } catch (error) {
         throw {
             success: false,
-            error: error.message || 'Ungültige Anmeldedaten'
+            error: error.error || 'Ungültige Anmeldedaten'
         };
     }
 }
@@ -248,10 +265,4 @@ export async function setUserActiveAPI(adminUser, targetUser, active) {
     } catch (error) {
         throw error;
     }
-}
-
-}
-
-export async function endRoundAPI() {
-    return { success: true, message: 'Round ended via WebSocket' };
 }
