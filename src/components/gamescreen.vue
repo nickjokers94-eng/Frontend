@@ -13,11 +13,11 @@ import {
   onUserJoined,
   onUserLeft,
   onPlayerList,
-  onSync,
   onWelcome,
   onCorrectGuess,
   onError,
-  isConnected 
+  isConnected,
+  sendEvent
 } from '../ws.js'
 
 const props = defineProps({
@@ -40,9 +40,13 @@ const lastRoundSolution = ref('')
 const roundNumber = ref(0)
 const gameActive = ref(false)
 const wsConnected = ref(false)
+const playerScores = ref({})
+const totalGuesses = ref(0)
 
 const isGameOver = computed(
-  () => guesses.value.length === MAX_GUESSES || guesses.value.includes(solution.value)
+  () => guesses.value.length === MAX_GUESSES || 
+        guesses.value.some(g => g === solution.value) ||
+        totalGuesses.value >= 6
 )
 
 const maxGuessesForPlayer = computed(() => {
@@ -60,7 +64,12 @@ const canMakeGuess = computed(() => {
   return playerGuessCount.value < maxGuessesForPlayer.value && 
          !isGameOver.value && 
          gameActive.value && 
-         wsConnected.value
+         wsConnected.value &&
+         totalGuesses.value < 6
+})
+
+const currentPlayerScore = computed(() => {
+  return playerScores.value[props.user.user]?.roundScore || 0
 })
 
 function getPlayerGuessCount(username) {
@@ -89,6 +98,8 @@ async function submitGuess() {
     if (!canMakeGuess.value) {
       if (!wsConnected.value) {
         alert('Keine Verbindung zum Server!')
+      } else if (totalGuesses.value >= 6) {
+        alert('Maximale Gesamtanzahl von 6 Versuchen erreicht!')
       } else {
         alert(`Du hast keine Versuche mehr! (${playerGuessCount.value}/${maxGuessesForPlayer.value})`)
       }
@@ -102,7 +113,7 @@ async function submitGuess() {
   }
   
   try {
-    // Nur WebSocket - kein API-Call!
+    // WebSocket-Guess senden
     sendGuess(currentGuess.value, props.user.user)
     currentGuess.value = ''
   } catch (error) {
@@ -137,6 +148,8 @@ function resetGameState() {
   currentGuess.value = ''
   keyboardColors.value = {}
   gameActive.value = true
+  totalGuesses.value = 0
+  playerScores.value = {}
 }
 
 function handleKeyPress(e) {
@@ -146,52 +159,66 @@ function handleKeyPress(e) {
   else if (key.length === 1 && key.match(/[a-zäöü]/i)) addLetter(key)
 }
 
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
 let ws
 
 onMounted(async () => {
   console.log('🎮 Gamescreen wird geladen...')
   console.log('🔗 Verbinde mit WebSocket...')
   
-  // Nur WebSocket - keine API-Calls!
+  // WebSocket verbinden
   ws = connectWebSocket('ws://localhost:3000', props.user.user)
   
   // Event-Handler registrieren
   onWelcome((data) => {
     console.log('🎉 Willkommen:', data)
     wsConnected.value = true
+    // Game State anfordern
+    sendEvent('requestGameState')
   })
   
-  onSync((data) => {
-    console.log('🔄 Spielzustand synchronisiert:', data)
-    wsConnected.value = true
+  // Neuer Handler für Game State
+  sendEvent('gameState', (data) => {
+    console.log('🔄 Game State erhalten:', data)
     
-    // Alles vom Server bekommen
-    if (data.currentWord) {
+    if (data.currentWord && data.gameActive) {
       solution.value = data.currentWord
       gameActive.value = true
-      console.log('✅ Wort vom Server erhalten:', data.currentWord)
+      console.log('✅ Aktuelles Wort:', data.currentWord)
+    } else {
+      gameActive.value = false
     }
-    if (data.secondsLeft !== undefined) {
-      timer.value = data.secondsLeft
+    
+    if (data.timeRemaining !== undefined) {
+      timer.value = data.timeRemaining
     }
     if (data.roundNumber) {
       roundNumber.value = data.roundNumber
+    }
+    if (data.lastWord) {
+      lastRoundSolution.value = data.lastWord
     }
     if (data.players) {
       connectedUsers.value = data.players.map(p => p.name)
     }
     if (data.guesses) {
-      data.guesses.forEach(guessData => {
-        if (!guessedBy.value.some(g => g.user === guessData.user && g.guess === guessData.guess)) {
-          guessedBy.value.push({ user: guessData.user, guess: guessData.guess })
-          if (!guesses.value.includes(guessData.guess)) {
-            guesses.value.push(guessData.guess)
-          }
-        }
-      })
+      // Versuche verarbeiten
+      guessedBy.value = data.guesses.map(g => ({ 
+        user: g.user, 
+        guess: g.guess,
+        score: g.score || 0,
+        correct: g.correct || false
+      }))
+      guesses.value = data.guesses.map(g => g.guess)
+      totalGuesses.value = data.guesses.length
     }
-    if (data.lastWord) {
-      lastRoundSolution.value = data.lastWord
+    if (data.playerScores) {
+      playerScores.value = data.playerScores
     }
   })
   
@@ -202,14 +229,15 @@ onMounted(async () => {
     if (data.lastWord) {
       lastRoundSolution.value = data.lastWord
       setTimeout(() => {
-        alert(`Neue Runde! Letztes Wort war: ${data.lastWord}`)
+        alert(`🎯 Neue Runde ${data.roundNumber}!\n${data.lastWord ? `Letztes Wort: ${data.lastWord}` : 'Erste Runde'}`)
       }, 100)
     }
     
     // Neues Wort vom Server
     if (data.word) {
       solution.value = data.word
-      console.log('🎯 Neues Wort vom Server:', data.word)
+      gameActive.value = true
+      console.log('🎯 Neues Wort:', data.word)
     }
     
     if (data.duration) {
@@ -222,8 +250,30 @@ onMounted(async () => {
   onRoundEnded((data) => {
     console.log('🏁 Runde beendet:', data)
     gameActive.value = false
+    
+    if (data.playerScores) {
+      playerScores.value = data.playerScores
+    }
+    
+    let message = `🏁 Runde ${data.roundNumber} beendet!\n\nLösung: ${data.solution}\n`
+    
+    if (data.reason === 'solved') {
+      message += `✅ Wort wurde erraten!`
+    } else if (data.reason === 'timeout') {
+      message += `⏰ Zeit abgelaufen!`
+    } else if (data.reason === 'max_guesses') {
+      message += `🚫 6 Versuche erreicht!`
+    }
+    
+    // Punkte anzeigen
+    if (data.playerScores && data.playerScores[props.user.user]) {
+      const score = data.playerScores[props.user.user]
+      message += `\n\n🏆 Deine Punkte diese Runde: ${score.roundScore}`
+      message += `\n📊 Gesamtpunkte: ${score.totalScore}`
+    }
+    
     setTimeout(() => {
-      alert(`Runde beendet! Das Wort war: ${data.solution}`)
+      alert(message)
     }, 100)
   })
   
@@ -233,15 +283,25 @@ onMounted(async () => {
   
   onGuess((data) => {
     console.log('💭 Guess erhalten:', data)
-    const { guess, user } = data
+    const { guess, user, score, correct, totalGuessNumber } = data
     
-    // Alle Versuche hinzufügen (auch eigene für Sync)
+    // Versuche hinzufügen
     if (!guessedBy.value.some(g => g.user === user && g.guess === guess)) {
-      guessedBy.value.push({ user, guess })
+      guessedBy.value.push({ 
+        user, 
+        guess, 
+        score: score || 0,
+        correct: correct || false
+      })
     }
     
     if (!guesses.value.includes(guess)) {
       guesses.value.push(guess)
+    }
+    
+    // Total Guess Counter aktualisieren
+    if (totalGuessNumber) {
+      totalGuesses.value = totalGuessNumber
     }
     
     // Keyboard-Farben nur für eigene Versuche aktualisieren
@@ -253,32 +313,36 @@ onMounted(async () => {
   onCorrectGuess((data) => {
     console.log('🎯 Korrekter Versuch:', data)
     setTimeout(() => {
-      alert(`${data.user} hat das Wort erraten: ${data.word}!`)
-    }, 100)
+      alert(`🎉 ${data.user} hat das Wort erraten: ${data.word}!\n🏆 Punkte: ${data.score || 0}`)
+    }, 500)
   })
   
   onPlayerList((data) => {
     console.log('👥 Spielerliste aktualisiert:', data.players)
-    connectedUsers.value = data.players.map(p => p.name)
+    connectedUsers.value = data.players.map(p => ({ 
+      name: p.name, 
+      guessCount: p.guessCount,
+      maxGuesses: p.maxGuesses,
+      roundScore: p.roundScore || 0,
+      totalScore: p.totalScore || 0
+    }))
   })
   
   onUserJoined((data) => {
     console.log('➕ User beigetreten:', data.username)
-    if (!connectedUsers.value.includes(data.username)) {
-      connectedUsers.value.push(data.username)
-    }
+    // Spielerliste wird über playerList-Event aktualisiert
   })
   
   onUserLeft((data) => {
     console.log('➖ User verlassen:', data.username)
-    connectedUsers.value = connectedUsers.value.filter(u => u !== data.username)
+    connectedUsers.value = connectedUsers.value.filter(u => u.name !== data.username)
     guessedBy.value = guessedBy.value.filter(g => g.user !== data.username)
   })
   
   onError((data) => {
     console.error('❌ WebSocket Fehler:', data.message)
     wsConnected.value = false
-    alert('Fehler: ' + data.message)
+    alert('❌ Fehler: ' + data.message)
   })
   
   window.addEventListener('keydown', handleKeyPress)
@@ -288,6 +352,14 @@ onMounted(async () => {
     const connected = isConnected()
     connectionStatus.value = connected ? 'CONNECTED' : 'DISCONNECTED'
     wsConnected.value = connected
+    
+    // Automatisches Reconnect falls nötig
+    if (!connected && ws) {
+      console.log('🔄 Verbindung verloren, versuche Reconnect...')
+      setTimeout(() => {
+        ws = connectWebSocket('ws://localhost:3000', props.user.user)
+      }, 3000)
+    }
   }, 1000)
 })
 
@@ -308,6 +380,7 @@ onUnmounted(() => {
     <hr class="button-divider" />
 
     <main class="game-layout">
+      <!-- Linke Spalte: Letztes Wort & Status -->
       <div class="box">
         <h3>LETZTES WORT</h3>
         <div v-if="lastRoundSolution" class="last-word">
@@ -316,21 +389,33 @@ onUnmounted(() => {
         <div v-else class="no-last-word">
           Keine vorherige Runde
         </div>
-        <div class="round-info">
-          Runde: {{ roundNumber }}
-        </div>
-        <div class="connection-status" :class="connectionStatus.toLowerCase()">
-          {{ wsConnected ? '🟢 Online' : '🔴 Offline' }}
+        
+        <div class="game-status-box">
+          <div class="status-item">
+            <span class="label">Runde:</span>
+            <span class="value">{{ roundNumber }}</span>
+          </div>
+          
+          <div class="status-item">
+            <span class="label">Verbindung:</span>
+            <span class="value" :class="wsConnected ? 'connected' : 'disconnected'">
+              {{ wsConnected ? '🟢 Online' : '🔴 Offline' }}
+            </span>
+          </div>
+          
+          <div class="status-item">
+            <span class="label">Meine Punkte:</span>
+            <span class="value score">{{ currentPlayerScore }}</span>
+          </div>
         </div>
       </div>
 
+      <!-- Mittlere Spalte: Hauptspiel -->
       <div class="game-center">
         <div id="game-info">
-          <span>VERSUCHE: <span>{{ playerGuessCount }}/{{ maxGuessesForPlayer }}</span></span>
-          <span>TIMER: <span id="timer-display">{{ timer }}</span></span>
-          <span class="game-status">
-            {{ gameActive ? '🎮 Spiel aktiv' : '⏸️ Warten auf neue Runde' }}
-          </span>
+          <span>VERSUCHE: <span class="highlight">{{ playerGuessCount }}/{{ maxGuessesForPlayer }}</span></span>
+          <span>TIMER: <span id="timer-display" class="highlight">{{ formatTime(timer) }}</span></span>
+          <span>GESAMT: <span class="highlight">{{ totalGuesses }}/6</span></span>
         </div>
 
         <!-- Wartebildschirm wenn nicht verbunden -->
@@ -338,10 +423,18 @@ onUnmounted(() => {
           <h2>🔄 Verbinde mit Server...</h2>
           <p>Stelle sicher, dass der WebSocket-Server läuft:</p>
           <code>node server.js</code>
+          <div class="loading-dots">
+            <span></span><span></span><span></span>
+          </div>
         </div>
 
         <!-- Spiel nur wenn verbunden -->
         <div v-else>
+          <div class="game-status-info">
+            <span v-if="gameActive" class="status active">🎮 Spiel läuft</span>
+            <span v-else class="status waiting">⏸️ Warten auf neue Runde...</span>
+          </div>
+          
           <GameGrid :guesses="guesses" :currentGuess="currentGuess" :solution="solution" />
           <Keyboard
             @add="addLetter"
@@ -352,49 +445,95 @@ onUnmounted(() => {
           />
           
           <div v-if="!canMakeGuess && gameActive" class="guess-limit-info">
-            ⚠️ Keine Versuche mehr ({{ playerGuessCount }}/{{ maxGuessesForPlayer }})
+            <span v-if="totalGuesses >= 6">
+              🚫 Maximale Gesamtanzahl von 6 Versuchen erreicht!
+            </span>
+            <span v-else-if="playerGuessCount >= maxGuessesForPlayer">
+              ⚠️ Keine Versuche mehr für dich ({{ playerGuessCount }}/{{ maxGuessesForPlayer }})
+            </span>
+            <span v-else>
+              ⏸️ Warte auf andere Spieler...
+            </span>
           </div>
         </div>
       </div>
 
+      <!-- Rechte Spalte: Spieler & Versuche -->
       <div class="box">
-        <h3>SPIELER STATUS ({{ connectedUsers.length }})</h3>
+        <h3>SPIELER ({{ connectedUsers.length }})</h3>
         <div v-if="connectedUsers.length === 0" class="no-players">
           {{ wsConnected ? 'Warten auf andere Spieler...' : 'Offline - Server nicht erreichbar' }}
         </div>
-        <div v-for="user in connectedUsers" :key="user" class="player-status">
-          <span class="username">{{ user }}</span>
-          <span class="attempts">{{ getPlayerGuessCount(user) }}/{{ getMaxGuessesForUser(user) }}</span>
+        <div v-for="player in connectedUsers" :key="player.name" class="player-status">
+          <div class="player-info">
+            <span class="username" :class="{ 'current-user': player.name === user.user }">
+              {{ player.name }}
+              <span v-if="player.name === user.user" class="you-indicator">(Du)</span>
+            </span>
+            <div class="player-stats">
+              <span class="attempts">{{ getPlayerGuessCount(player.name) }}/{{ getMaxGuessesForUser(player.name) }}</span>
+              <span class="score">{{ playerScores[player.name]?.roundScore || 0 }}pts</span>
+            </div>
+          </div>
         </div>
         
         <h4>ALLE VERSUCHE ({{ guessedBy.length }})</h4>
-        <ul id="guessed-by">
-          <li v-for="(entry, index) in guessedBy" :key="index" 
-              :class="{ 'own-guess': entry.user === user.user }">
-            {{ entry.user }}: {{ entry.guess }}
-          </li>
-        </ul>
+        <div class="guesses-container">
+          <div v-if="guessedBy.length === 0" class="no-guesses">
+            Noch keine Versuche...
+          </div>
+          <div v-for="(entry, index) in guessedBy" :key="index" 
+               class="guess-entry"
+               :class="{ 
+                 'own-guess': entry.user === user.user,
+                 'correct-guess': entry.correct
+               }">
+            <div class="guess-info">
+              <span class="guess-user">{{ entry.user }}:</span>
+              <span class="guess-word">{{ entry.guess }}</span>
+              <span v-if="entry.correct" class="correct-indicator">✓</span>
+            </div>
+            <div class="guess-score" v-if="entry.score">
+              +{{ entry.score }}
+            </div>
+          </div>
+        </div>
       </div>
     </main>
 
     <footer>
-      <table id="scoreboard">
-        <thead>
-          <tr>
-            <th>SPIELER</th>
-            <th>PUNKTE</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>{{ user.user }}</td>
-            <td>{{ user.score || 0 }}</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="scoreboard-container">
+        <h3>AKTUELLE SITZUNG</h3>
+        <table id="scoreboard">
+          <thead>
+            <tr>
+              <th>SPIELER</th>
+              <th>RUNDEN-PUNKTE</th>
+              <th>GESAMT-PUNKTE</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr :class="{ 'current-player': user.user === user.user }">
+              <td>{{ user.user }}</td>
+              <td>{{ currentPlayerScore }}</td>
+              <td>{{ playerScores[user.user]?.totalScore || 0 }}</td>
+            </tr>
+            <tr v-for="[username, scores] in Object.entries(playerScores)" 
+                :key="username"
+                v-if="username !== user.user"
+                class="other-player">
+              <td>{{ username }}</td>
+              <td>{{ scores.roundScore || 0 }}</td>
+              <td>{{ scores.totalScore || 0 }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </footer>
 
-    <button v-if="user.role === 'admin'" class="admin-btn" @click="emit('showAdmin')">Admin-Bereich öffnen</button>
+    <button v-if="user.role === 'admin'" class="admin-btn" @click="emit('showAdmin')">
+      🔧 Admin-Bereich öffnen
+    </button>
   </section>
 </template>
 
@@ -419,81 +558,241 @@ onUnmounted(() => {
   font-family: monospace;
 }
 
-.connection-status {
-  font-size: 12px;
-  margin-top: 4px;
-  padding: 2px 6px;
-  border-radius: 4px;
+.loading-dots {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 20px;
 }
 
-.connection-status.connected {
+.loading-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #007bff;
+  animation: loading 1.4s infinite both;
+}
+
+.loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+.loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes loading {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+
+.game-status-box {
+  margin-top: 15px;
+  padding: 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.status-item:last-child {
+  margin-bottom: 0;
+}
+
+.label {
+  font-size: 12px;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.value {
+  font-weight: bold;
+}
+
+.value.connected {
+  color: #28a745;
+}
+
+.value.disconnected {
+  color: #dc3545;
+}
+
+.value.score {
+  color: #007bff;
+}
+
+.game-status-info {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.status {
+  padding: 6px 12px;
+  border-radius: 15px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.status.active {
   background: #d4edda;
   color: #155724;
 }
 
-.connection-status.disconnected {
-  background: #f8d7da;
-  color: #721c24;
+.status.waiting {
+  background: #fff3cd;
+  color: #856404;
 }
 
-.round-info {
-  font-size: 14px;
-  color: #666;
-  margin-top: 8px;
-}
-
-.game-status {
-  font-size: 14px;
-  margin-left: 10px;
-}
-
-.no-players {
-  font-style: italic;
-  color: #666;
-  padding: 8px;
+.highlight {
+  color: #007bff;
+  font-weight: bold;
 }
 
 .guess-limit-info {
   background: #fff3cd;
   border: 1px solid #ffeaa7;
   color: #856404;
-  padding: 8px 12px;
+  padding: 10px 15px;
   border-radius: 6px;
-  margin-top: 10px;
+  margin-top: 15px;
   text-align: center;
+  font-weight: bold;
 }
 
 .player-status {
+  margin-bottom: 8px;
+  padding: 8px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+}
+
+.player-info {
   display: flex;
   justify-content: space-between;
-  padding: 4px 8px;
-  margin: 2px 0;
-  background: #f8f9fa;
-  border-radius: 4px;
+  align-items: center;
 }
 
 .username {
   font-weight: bold;
+  color: #333;
 }
 
-.attempts {
-  color: #666;
+.username.current-user {
+  color: #007bff;
+}
+
+.you-indicator {
+  font-size: 11px;
+  color: #6c757d;
+  font-weight: normal;
+}
+
+.player-stats {
+  display: flex;
+  gap: 8px;
   font-size: 12px;
 }
 
-#guessed-by {
-  max-height: 150px;
-  overflow-y: auto;
-  padding-left: 20px;
+.attempts {
+  background: #f8f9fa;
+  padding: 2px 6px;
+  border-radius: 10px;
+  color: #666;
 }
 
-#guessed-by li {
-  margin: 2px 0;
-  font-size: 14px;
-}
-
-#guessed-by li.own-guess {
+.score {
+  background: #e3f2fd;
+  padding: 2px 6px;
+  border-radius: 10px;
+  color: #1976d2;
   font-weight: bold;
+}
+
+.guesses-container {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 10px;
+}
+
+.no-guesses {
+  text-align: center;
+  color: #6c757d;
+  font-style: italic;
+  padding: 15px;
+}
+
+.guess-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+  transition: all 0.2s;
+}
+
+.guess-entry.own-guess {
+  border-color: #007bff;
+  background: #f8f9ff;
+}
+
+.guess-entry.correct-guess {
+  border-color: #28a745;
+  background: #f8fff9;
+}
+
+.guess-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.guess-user {
+  font-size: 12px;
+  color: #666;
+  min-width: 60px;
+}
+
+.guess-word {
+  font-weight: bold;
+  font-family: monospace;
+}
+
+.correct-indicator {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.guess-score {
+  font-size: 11px;
   color: #007bff;
+  font-weight: bold;
+}
+
+.scoreboard-container {
+  margin-top: 30px;
+}
+
+.scoreboard-container h3 {
+  text-align: center;
+  margin-bottom: 15px;
+  color: #666;
+}
+
+#scoreboard {
+  margin: 0 auto;
+  max-width: 600px;
+}
+
+.current-player {
+  background-color: #e7f3ff;
+  font-weight: bold;
+}
+
+.other-player {
+  opacity: 0.8;
 }
 </style>
