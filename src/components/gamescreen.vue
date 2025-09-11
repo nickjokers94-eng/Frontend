@@ -7,13 +7,14 @@ import {
   connectWebSocket, 
   closeWebSocket, 
   sendGuess, 
-  onGuessSubmitted, 
-  onRoundStarted, 
-  onRoundEnded, 
+  onGuessSubmitted,
+  onNewRound,
+  onRoundEnded,
   onTimerUpdate,
   onUserJoined,
   onUserLeft,
-  isConnected 
+  isConnected,
+  onEvent
 } from '../ws.js'
 
 const props = defineProps({
@@ -32,7 +33,7 @@ const guessedBy = ref([]) // Array für Rateversuche mit Benutzername: [{user: '
 const connectedUsers = ref([]) // Liste der verbundenen Spieler
 const connectionStatus = ref('DISCONNECTED')
 const timer = ref(60)
-const lastRoundSolution = ref('') // Letztes Wort der vorherigen Runde
+let localTimerInterval = null
 
 const isGameOver = computed(
   () => guesses.value.length === MAX_GUESSES || guesses.value.includes(solution.value)
@@ -68,7 +69,7 @@ function getMaxGuessesForUser(username) {
 
 function addLetter(letter) {
   if (currentGuess.value.length < GUESS_LENGTH && !isGameOver.value) {
-    currentGuess.value += letter
+    currentGuess.value += letter.toUpperCase()
   }
 }
 
@@ -86,12 +87,12 @@ async function submitGuess() {
   
   try {
     await submitGuessAPI(currentGuess.value)
-    
-    guesses.value.push(currentGuess.value)
-    updateKeyboardColors(currentGuess.value)
-    guessedBy.value.push({ user: props.user.user, guess: currentGuess.value })
-    
-    sendGuess(currentGuess.value, props.user.user)
+
+    guesses.value.push(currentGuess.value.toUpperCase())
+    updateKeyboardColors(currentGuess.value.toUpperCase())
+    guessedBy.value.push({ user: props.user.user, guess: currentGuess.value.toUpperCase() })
+
+    sendGuess(currentGuess.value.toUpperCase(), props.user.user)
     
     if (currentGuess.value === solution.value) {
       setTimeout(() => alert('Super! Du hast das Wort erraten!'), 200 * GUESS_LENGTH)
@@ -141,7 +142,7 @@ let ws
   onMounted(async () => {
   try {
     const response = await getNewSolutionWordAPI()
-    solution.value = response.data.word
+    solution.value = response.data.word.toUpperCase()
   } catch (error) {
     console.error('Fehler beim Laden des Lösungsworts:', error)
     solution.value = 'ERROR'
@@ -152,18 +153,18 @@ let ws
   ws = connectWebSocket('ws://localhost:3000', props.user.user)
   
   onGuessSubmitted((data) => {
-    const { guess, user } = data
-    
-    if (user !== props.user.user) {
-      if (!guesses.value.includes(guess)) {
-        guesses.value.push(guess)
-      }
-      
-      if (!guessedBy.value.some(g => g.user === user && g.guess === guess)) {
-        guessedBy.value.push({ user, guess })
-      }
+  const { guess, user } = data
+
+  const guessUpper = guess.toUpperCase()
+  if (user !== props.user.user) {
+    if (!guesses.value.includes(guessUpper)) {
+      guesses.value.push(guessUpper)
     }
-  })
+    if (!guessedBy.value.some(g => g.user === user && g.guess === guessUpper)) {
+      guessedBy.value.push({ user, guess: guessUpper })
+    }
+  }
+})
   
   onNewRound((data) => {
     console.log('Neue Runde gestartet:', data)
@@ -178,17 +179,21 @@ let ws
     }
     
     if (data.word) {
-      solution.value = data.word
+      solution.value = data.word.toUpperCase()
     } else {
       getNewSolutionWordAPI().then(response => {
-        solution.value = response.data.word
+        solution.value = response.data.word.toUpperCase()
       })
     }
   })
   
   onRoundEnded((data) => {
-    console.log('Runde beendet:', data)
-    alert(`Runde beendet! Das Wort war: ${data.solution}`)
+    const solutionUpper = data.solution.toUpperCase()
+    if (!guesses.value.includes(solutionUpper)) {
+      guesses.value.push(solutionUpper)
+      guessedBy.value.push({ user: 'Lösung', guess: solutionUpper })
+    }
+    alert(`Runde beendet! Das Wort war: ${solutionUpper}`)
   })
   
   onSync((data) => {
@@ -208,6 +213,14 @@ let ws
   
   onTimerUpdate((data) => {
     timer.value = data.secondsLeft
+
+    // Lokalen Countdown neu starten
+    if (localTimerInterval) clearInterval(localTimerInterval)
+    localTimerInterval = setInterval(() => {
+      if (timer.value > 0) {
+        timer.value--
+      }
+    }, 1000)
   })
   
   onUserJoined((data) => {
@@ -222,6 +235,32 @@ let ws
     connectedUsers.value = connectedUsers.value.filter(u => u !== data.username)
   })
   
+  // NEU: correctGuess-Event verarbeiten
+  onEvent('correctGuess', (data) => {
+  const wordUpper = data.word.toUpperCase()
+  if (!guesses.value.includes(wordUpper)) {
+    guesses.value.push(wordUpper)
+    guessedBy.value.push({ user: data.user, guess: wordUpper })
+  }
+  solution.value = wordUpper
+  // ...alert wie oben...
+})
+
+  // NEU: Spielzustand-Event verarbeiten
+  onEvent('gameState', (data) => {
+    // Setze alle States auf den aktuellen Stand der Lobby!
+    if (data.currentWord) solution.value = data.currentWord.toUpperCase()
+    if (Array.isArray(data.guesses)) guesses.value = data.guesses.map(g => g.guess.toUpperCase ? g.guess.toUpperCase() : g.guess)
+    if (Array.isArray(data.guesses)) guessedBy.value = data.guesses.map(g => ({ user: g.user, guess: g.guess.toUpperCase ? g.guess.toUpperCase() : g.guess }))
+    if (typeof data.timeRemaining === 'number') timer.value = data.timeRemaining
+    if (typeof data.roundNumber === 'number') lastRoundSolution.value = data.lastWord ? data.lastWord.toUpperCase() : ''
+    // Optional: Spieler-Liste aktualisieren
+    if (Array.isArray(data.players)) connectedUsers.value = data.players.map(p => p.name)
+    // Tastaturfarben ggf. neu berechnen
+    keyboardColors.value = {}
+    guesses.value.forEach(g => updateKeyboardColors(g))
+  })
+
   setInterval(() => {
     connectionStatus.value = isConnected() ? 'CONNECTED' : 'DISCONNECTED'
   }, 1000)
@@ -230,6 +269,7 @@ let ws
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyPress)
   closeWebSocket()
+  if (localTimerInterval) clearInterval(localTimerInterval)
 })
 </script>
 

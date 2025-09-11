@@ -97,28 +97,33 @@ export async function registerAPI(username, password) {
  */
 export async function loginAPI(username, password) {
     try {
-        const testResponse = await fetch(`${API_BASE_URL}/highscores`, {
-            method: 'GET',
+        const response = await fetch(`${API_BASE_URL}/user/login`, {
+            method: 'POST',
             headers: {
-                'Authorization': 'Basic ' + btoa(SPRING_SECURITY_USER + ':' + SPRING_SECURITY_PASSWORD),
-                'Content-Type': 'application/json'
-            }
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({ username, password })
         });
 
-        if (!testResponse.ok) {
-            if (testResponse.status === 401) {
+        if (!response.ok) {
+            if (response.status === 401) {
                 throw new Error('Ungültige Anmeldedaten');
             }
             throw new Error('Anmeldung fehlgeschlagen');
         }
 
-        // Erfolgreiche Authentifizierung - User-Objekt erstellen
+        const result = await response.json();
+        if (!result || !result.username) {
+            throw new Error('Ungültige Anmeldedaten');
+        }
+
         return {
             success: true,
             data: {
-                user: username,
-                role: username === 'admin' ? 'admin' : 'user',
-                score: 0
+                user: result.username,
+                role: result.role,
+                status: result.status,
+                id: result.userid
             }
         };
     } catch (error) {
