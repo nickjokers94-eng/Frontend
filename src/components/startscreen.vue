@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { loginAPI, registerAPI } from '../api.js'
+import { loginAPI, registerAPI, changePasswordAPI } from '../api.js'
 
 const emit = defineEmits(['login-successful'])
 
@@ -9,6 +9,15 @@ const password = ref('')
 const error = ref(null)
 const success = ref(null)
 const isLoading = ref(false)
+
+// Passwort ändern Modal
+const showChangePw = ref(false)
+const pwUser = ref('')
+const oldPassword = ref('')
+const newPassword = ref('')
+const confirmPassword = ref('')
+const pwError = ref('')
+const pwMessage = ref('')
 
 async function login() {
   isLoading.value = true
@@ -44,11 +53,51 @@ async function register() {
     isLoading.value = false
   }
 }
+
+function openChangePw() {
+  showChangePw.value = true
+  pwUser.value = username.value // Username vorausfüllen
+  oldPassword.value = ''
+  newPassword.value = ''
+  confirmPassword.value = ''
+  pwError.value = ''
+  pwMessage.value = ''
+}
+
+function closeChangePw() {
+  showChangePw.value = false
+}
+
+async function changePassword() {
+  pwError.value = ''
+  pwMessage.value = ''
+  if (!pwUser.value || !oldPassword.value || !newPassword.value || !confirmPassword.value) {
+    pwError.value = 'Bitte alle Felder ausfüllen'
+    return
+  }
+  if (newPassword.value !== confirmPassword.value) {
+    pwError.value = 'Neue Passwörter stimmen nicht überein'
+    return
+  }
+  if (newPassword.value.length < 3) {
+    pwError.value = 'Neues Passwort muss mindestens 3 Zeichen haben'
+    return
+  }
+  try {
+    await changePasswordAPI(pwUser.value, oldPassword.value, newPassword.value)
+    pwMessage.value = 'Passwort erfolgreich geändert'
+    oldPassword.value = ''
+    newPassword.value = ''
+    confirmPassword.value = ''
+  } catch (err) {
+    pwError.value = err.error || 'Fehler beim Ändern des Passworts'
+  }
+}
 </script>
 
 <template>
   <section class="screen active">
-    <img src="https://media.discordapp.net/attachments/903679816035876914/1410239792569909280/Design_ohne_Titel.png?ex=68b04ba7&is=68aefa27&hm=4e90d176d93cd71ef858cd493d48e66e3d3c0515acb7076f4f7d8cc2a60ceca2&=&format=webp&quality=lossless&width=625&height=625" alt="Wortratespiel Logo" class="logo-image">
+    <img src="https://i.imgur.com/rE702YZ.png" alt="Wortratespiel Logo" class="logo-image">
     <h1>Das Wortratespiel</h1>
     <p>alleine oder mit Freunden</p>
 
@@ -66,10 +115,42 @@ async function register() {
       <button type="submit" :disabled="isLoading">
         {{ isLoading ? 'Melde an...' : 'Anmelden' }}
       </button>
+      <button type="button" class="register-btn" style="background:#0077cc;margin-top:16px;" @click="openChangePw">
+        Passwort ändern
+      </button>
       <button type="button" class="register-btn" @click="register" :disabled="isLoading">
         {{ isLoading ? 'Registriere...' : 'Registrieren' }}
       </button>
     </form>
+
+    <!-- Passwort ändern Modal -->
+    <div v-if="showChangePw" class="modal">
+      <div class="modal-content" style="max-width:400px;">
+        <h2>Passwort ändern</h2>
+        <form @submit.prevent="changePassword">
+          <div class="form-group">
+            <label for="pw-user">Benutzername</label>
+            <input type="text" id="pw-user" v-model="pwUser" required readonly>
+          </div>
+          <div class="form-group">
+            <label for="old-pw">Altes Passwort</label>
+            <input type="password" id="old-pw" v-model="oldPassword" required>
+          </div>
+          <div class="form-group">
+            <label for="new-pw">Neues Passwort</label>
+            <input type="password" id="new-pw" v-model="newPassword" required>
+          </div>
+          <div class="form-group">
+            <label for="confirm-pw">Neues Passwort bestätigen</label>
+            <input type="password" id="confirm-pw" v-model="confirmPassword" required>
+          </div>
+          <div v-if="pwError" style="color:red;">{{ pwError }}</div>
+          <div v-if="pwMessage" style="color:green;">{{ pwMessage }}</div>
+          <button type="submit">Speichern</button>
+          <button type="button" @click="closeChangePw" style="margin-left:10px;">Abbrechen</button>
+        </form>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -94,5 +175,23 @@ async function register() {
 .register-btn:disabled {
   background-color: #adb5bd;
   cursor: not-allowed;
+}
+
+/* Modal Styles */
+.modal {
+  display: block;
+  position: fixed;
+  z-index: 1000;
+  left: 0; top: 0; width: 100%; height: 100%;
+  background-color: rgba(0,0,0,0.5);
+}
+.modal-content {
+  background: #fff;
+  margin: 8% auto;
+  padding: 20px 30px;
+  border-radius: 10px;
+  max-width: 400px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  position: relative;
 }
 </style>

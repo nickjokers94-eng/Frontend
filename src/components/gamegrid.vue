@@ -43,7 +43,8 @@ const tiles = computed(() => {
     allTiles.push(row)
   })
 
-  if (allTiles.length < MAX_GUESSES) {
+  // Nur eine Eingabezeile anzeigen, wenn currentGuess nicht leer ist
+  if (allTiles.length < MAX_GUESSES && props.currentGuess && props.currentGuess.length > 0) {
     let currentRow = []
     for (let i = 0; i < GUESS_LENGTH; i++) {
       currentRow.push({ letter: props.currentGuess[i] || '', status: '' })

@@ -23,7 +23,7 @@ import {
 const props = defineProps({
   user: Object
 })
-const emit = defineEmits(['logout', 'showHighscore', 'showChangePassword', 'showAdmin'])
+const emit = defineEmits(['logout', 'showHighscore', 'showAdmin'])
 
 const GUESS_LENGTH = 5
 const MAX_GUESSES = 6
@@ -72,7 +72,7 @@ function getMaxGuessesForUser(username) {
 }
 
 function addLetter(letter) {
-  if (currentGuess.value.length < GUESS_LENGTH && !isGameOver.value) {
+  if (currentGuess.value.length < GUESS_LENGTH && !isGameOver.value && canMakeGuess.value) {
     currentGuess.value += letter.toUpperCase()
   }
 }
@@ -85,6 +85,7 @@ async function submitGuess() {
   if (currentGuess.value.length !== GUESS_LENGTH || isGameOver.value || !canMakeGuess.value) {
     if (!canMakeGuess.value) {
       alert(`Du hast keine Versuche mehr! (${playerGuessCount.value}/${maxGuessesForPlayer.value})`)
+      currentGuess.value = '' // Leere das Feld, damit nichts im Grid angezeigt wird!
     }
     return
   }
@@ -144,6 +145,8 @@ function handleKeyPress(e) {
 let ws
 
 onMounted(async () => {
+  connectedUsers.value = [] // Reset bei jedem Mount
+
   try {
     const response = await getNewSolutionWordAPI()
     solution.value = response.data.word.toUpperCase()
@@ -241,7 +244,7 @@ onMounted(async () => {
     connectedUsers.value = connectedUsers.value.filter(u => u !== data.username)
   })
   
-  // NEU: correctGuess-Event verarbeiten
+  // correctGuess-Event verarbeiten
   onEvent('correctGuess', (data) => {
     const wordUpper = data.word.toUpperCase()
     if (!guesses.value.includes(wordUpper)) {
@@ -249,20 +252,17 @@ onMounted(async () => {
       guessedBy.value.push({ user: data.user, guess: wordUpper })
     }
     solution.value = wordUpper
-    // ...alert wie oben...
   })
 
-  // NEU: Spielzustand-Event verarbeiten
+  // Spielzustand-Event verarbeiten
   onEvent('gameState', (data) => {
-    // Setze alle States auf den aktuellen Stand der Lobby!
     if (data.currentWord) solution.value = data.currentWord.toUpperCase()
     if (Array.isArray(data.guesses)) guesses.value = data.guesses.map(g => g.guess.toUpperCase ? g.guess.toUpperCase() : g.guess)
     if (Array.isArray(data.guesses)) guessedBy.value = data.guesses.map(g => ({ user: g.user, guess: g.guess.toUpperCase ? g.guess.toUpperCase() : g.guess }))
     if (typeof data.timeRemaining === 'number') timer.value = data.timeRemaining
     if (typeof data.lastWord === 'string') lastRoundSolution.value = data.lastWord ? data.lastWord.toUpperCase() : ''
-    // Optional: Spieler-Liste aktualisieren
+    // Spieler-Liste IMMER aktualisieren!
     if (Array.isArray(data.players)) connectedUsers.value = data.players.map(p => p.name)
-    // Tastaturfarben ggf. neu berechnen
     keyboardColors.value = {}
     guesses.value.forEach(g => updateKeyboardColors(g))
   })
@@ -279,7 +279,6 @@ onUnmounted(() => {
   <section class="screen">
     <header class="top-buttons">
       <button @click="emit('showHighscore')">HIGHSCORE ANZEIGEN</button>
-      <button @click="emit('showChangePassword')">PASSWORT ÄNDERN</button>
       <button @click="emit('logout')">ABMELDEN</button>
     </header>
 
@@ -302,7 +301,8 @@ onUnmounted(() => {
           <span>TIMER: <span id="timer-display">{{ timer }}</span></span>
         </div>
 
-        <GameGrid :guesses="guesses" :currentGuess="currentGuess" :solution="solution" />
+        <!-- WICHTIG: currentGuess wird nur übergeben, wenn canMakeGuess true ist -->
+        <GameGrid :guesses="guesses" :currentGuess="canMakeGuess ? currentGuess : ''" :solution="solution" />
         <Keyboard
           @add="addLetter"
           @delete="deleteLetter"

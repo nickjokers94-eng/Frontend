@@ -1,8 +1,6 @@
 // src/ws.js - WebSocket Client für Live-Events
 
 let socket = null
-let reconnectAttempts = 0
-const maxReconnectAttempts = 5
 let eventListeners = new Map()
 
 // === VERBINDUNGSMANAGEMENT ===
@@ -16,8 +14,6 @@ export function connectWebSocket(url = 'ws://localhost:3000', username = null) {
   
   socket.onopen = () => {
     console.log('WebSocket verbunden')
-    reconnectAttempts = 0
-    
     // Bei Verbindung: User registrieren
     if (username) {
       sendEvent('playerJoin', { user: username })
@@ -35,7 +31,7 @@ export function connectWebSocket(url = 'ws://localhost:3000', username = null) {
   
   socket.onclose = () => {
     console.log('WebSocket-Verbindung geschlossen')
-    attemptReconnect(url, username)
+    // KEIN Reconnect!
   }
   
   socket.onerror = (error) => {
@@ -43,16 +39,6 @@ export function connectWebSocket(url = 'ws://localhost:3000', username = null) {
   }
   
   return socket
-}
-
-function attemptReconnect(url, username) {
-  if (reconnectAttempts < maxReconnectAttempts) {
-    reconnectAttempts++
-    console.log(`Reconnect-Versuch ${reconnectAttempts}/${maxReconnectAttempts}`)
-    setTimeout(() => {
-      connectWebSocket(url, username)
-    }, 3000 * reconnectAttempts) // Exponentieller Backoff
-  }
 }
 
 export function closeWebSocket() {

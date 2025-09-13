@@ -155,7 +155,7 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
   <!-- Festes Logo, sichtbar auf allen Bildschirmen außer Start -->
   <img
     v-if="isLoggedIn"
-    src="https://media.discordapp.net/attachments/903679816035876914/1410239792569909280/Design_ohne_Titel.png?ex=68b04ba7&is=68aefa27&hm=4e90d176d93cd71ef858cd493d48e66e3d3c0515acb7076f4f7d8cc2a60ceca2&=&format=webp&quality=lossless&width=625&height=625"
+    src="https://i.imgur.com/rE702YZ.png"
     alt="Logo"
     class="header-logo"
   />
@@ -209,6 +209,7 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
     <header>
       <button @click="activateSelectedUsers" :disabled="selectedUsers.length === 0">Freischalten</button>
       <button @click="deleteSelectedUsers" :disabled="selectedUsers.length === 0" class="delete-btn">Löschen</button>
+      <button @click="loadPendingUsers" style="margin-left:16px;">Aktualisieren</button>
     </header>
     
     <div v-if="adminMessage" class="admin-message success">{{ adminMessage }}</div>
