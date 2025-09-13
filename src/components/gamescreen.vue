@@ -38,6 +38,7 @@ const timer = ref(60)
 let localTimerInterval = null
 
 const lastRoundSolution = ref('')
+const roundScore = ref(0) // aktueller Rundenscore
 
 const isGameOver = computed(
   () => guesses.value.length === MAX_GUESSES || guesses.value.includes(solution.value)
@@ -171,6 +172,7 @@ onMounted(async () => {
         guessedBy.value.push({ user, guess: guessUpper })
       }
     }
+    // Score-Update für andere Spieler ignorieren, nur eigenen Score anzeigen
   })
   
   onNewRound((data) => {
@@ -179,6 +181,7 @@ onMounted(async () => {
     guessedBy.value = []
     currentGuess.value = ''
     keyboardColors.value = {}
+    roundScore.value = 0 // Score bei neuer Runde zurücksetzen
     
     // Letztes Wort anzeigen wenn verfügbar
     if (data.lastWord) {
@@ -202,9 +205,13 @@ onMounted(async () => {
       guesses.value.push(solutionUpper)
       guessedBy.value.push({ user: 'Lösung', guess: solutionUpper })
     }
+    // ECHTE Punkte vom Server übernehmen!
+    if (data.playerScores && data.playerScores[props.user.user]) {
+      roundScore.value = data.playerScores[props.user.user].roundScore
+    }
     alert(`Runde beendet! Das Wort war: ${solutionUpper}`)
   })
-  
+
   onSync((data) => {
     console.log('Spielzustand synchronisiert:', data)
     timer.value = data.secondsLeft
@@ -337,7 +344,7 @@ onUnmounted(() => {
         <tbody>
           <tr>
             <td>{{ user.user }}</td>
-            <td>{{ user.score || 0 }}</td>
+            <td>{{ roundScore }}</td>
           </tr>
         </tbody>
       </table>

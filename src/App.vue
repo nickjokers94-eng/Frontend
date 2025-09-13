@@ -259,7 +259,6 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
             <th>Rang</th>
             <th>Spieler</th>
             <th>Punkte</th>
-            <th>Datum</th>
           </tr>
         </thead>
         <tbody>
@@ -268,7 +267,6 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
             <td>{{ score.rank }}</td>
             <td>{{ score.name }}</td>
             <td>{{ score.score }}</td>
-            <td>{{ score.date }}</td>
           </tr>
         </tbody>
       </table>
