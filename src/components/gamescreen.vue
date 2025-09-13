@@ -35,6 +35,9 @@ const connectionStatus = ref('DISCONNECTED')
 const timer = ref(60)
 let localTimerInterval = null
 
+const currentPlayer = ref(null)
+const currentPlayerTurn = ref(null)
+
 const isGameOver = computed(
   () => guesses.value.length === MAX_GUESSES || guesses.value.includes(solution.value)
 )
@@ -53,7 +56,9 @@ const playerGuessCount = computed(() => {
 })
 
 const canMakeGuess = computed(() => {
-  return playerGuessCount.value < maxGuessesForPlayer.value && !isGameOver.value
+  return playerGuessCount.value < maxGuessesForPlayer.value &&
+         !isGameOver.value &&
+         currentPlayerTurn.value === props.user.user
 })
 
 function getPlayerGuessCount(username) {
@@ -172,6 +177,7 @@ let ws
     guessedBy.value = []
     currentGuess.value = ''
     keyboardColors.value = {}
+    currentPlayer.value = data.currentPlayer || null
     
     // Letztes Wort anzeigen wenn verfügbar
     if (data.lastWord) {
@@ -260,6 +266,13 @@ let ws
     keyboardColors.value = {}
     guesses.value.forEach(g => updateKeyboardColors(g))
   })
+  
+  onEvent('turnUpdate', (data) => {
+    currentPlayerTurn.value = data.currentPlayer
+  })
+  onNewRound((data) => {
+    currentPlayerTurn.value = data.currentPlayer || null
+  })
 
   setInterval(() => {
     connectionStatus.value = isConnected() ? 'CONNECTED' : 'DISCONNECTED'
@@ -300,6 +313,15 @@ onUnmounted(() => {
           <span>TIMER: <span id="timer-display">{{ timer }}</span></span>
           <span class="connection-status" :class="connectionStatus.toLowerCase()">
             {{ connectionStatus === 'CONNECTED' ? '🟢' : '🔴' }} {{ connectionStatus }}
+          </span>
+        </div>
+
+        <div class="turn-info" style="margin-bottom: 10px;">
+          <span v-if="currentPlayer">
+            <strong>Zug:</strong>
+            <span :style="{ color: currentPlayer === user.user ? '#6aaa64' : '#b59f3b' }">
+              {{ currentPlayer === user.user ? 'Du bist dran!' : currentPlayer + ' ist dran' }}
+            </span>
           </span>
         </div>
 
