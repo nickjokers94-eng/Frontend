@@ -6,6 +6,17 @@ import {
 } from './api.js'
 import GameScreen from './components/gamescreen.vue'
 import StartScreen from './components/startscreen.vue'
+import Snackbar from './components/snackbar.vue'
+
+// --- Snackbar Queue ---
+const snackbarQueue = ref([])
+function showSnackbar(message, type = 'info', duration = 5000) {
+  const id = Date.now() + Math.random()
+  snackbarQueue.value.push({ id, message, type })
+  setTimeout(() => {
+    snackbarQueue.value = snackbarQueue.value.filter(s => s.id !== id)
+  }, duration)
+}
 
 // --- Zustandsverwaltung ---
 const activeScreen = ref('start')
@@ -266,6 +277,7 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
     @show-highscore="openHighscore"
     @show-help="openHelp"
     @show-admin="openAdminPanel"
+    @snackbar="e => showSnackbar(e.message, e.type)"
   />
 
   <!-- Passwort-Ändern-Bildschirm -->
@@ -364,11 +376,14 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
 
         <h4 style="margin-top:24px;">WORTLISTE</h4>
         <div v-if="wordListError" style="color:red;">{{ wordListError }}</div>
-        <ul style="list-style:none; padding:0;">
-          <li v-for="wordObj in wordList" :key="wordObj.id" style="margin-bottom:8px;">
-            <span style="font-family:monospace; font-size:1.1em;">{{ wordObj.word }}</span>
-          </li>
-        </ul>
+        <!-- Scrollbare Wortliste, max. 10 Wörter sichtbar -->
+        <div style="max-height: 370px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; background: #fafbfc; margin-top: 8px;">
+          <ul style="list-style:none; padding:0; margin:0;">
+            <li v-for="wordObj in wordList" :key="wordObj.id" style="margin-bottom:8px; padding: 8px 12px;">
+              <span style="font-family:monospace; font-size:1.1em;">{{ wordObj.word }}</span>
+            </li>
+          </ul>
+        </div>
       </div>
     </main>
     <button class="close-btn" @click="activeScreen = 'game'">ADMIN BEREICH SCHLIESSEN</button>
@@ -445,6 +460,9 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
       <button class="close-btn small-close-btn" @click="closeHelp">Schließen</button>
     </div>
   </div>
+
+  <!-- Snackbar-Stack ganz unten einbinden -->
+  <Snackbar :snackbars="snackbarQueue" />
 </template>
 
 <style>

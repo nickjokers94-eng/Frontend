@@ -23,7 +23,7 @@ import {
 const props = defineProps({
   user: Object
 })
-const emit = defineEmits(['logout', 'showHighscore', 'showAdmin', 'showHelp'])
+const emit = defineEmits(['logout', 'showHighscore', 'showAdmin', 'showHelp', 'snackbar'])
 
 const GUESS_LENGTH = 5
 const MAX_GUESSES = 6
@@ -85,8 +85,8 @@ function deleteLetter() {
 async function submitGuess() {
   if (currentGuess.value.length !== GUESS_LENGTH || isGameOver.value || !canMakeGuess.value) {
     if (!canMakeGuess.value) {
-      alert(`Du hast keine Versuche mehr! (${playerGuessCount.value}/${maxGuessesForPlayer.value})`)
-      currentGuess.value = '' // Leere das Feld, damit nichts im Grid angezeigt wird!
+      emit('snackbar', { message: `Du hast keine Versuche mehr! (${playerGuessCount.value}/${maxGuessesForPlayer.value})`, type: 'error' })
+      currentGuess.value = ''
     }
     return
   }
@@ -101,10 +101,10 @@ async function submitGuess() {
     sendGuess(currentGuess.value.toUpperCase(), props.user.user)
     
     if (currentGuess.value === solution.value) {
-      setTimeout(() => alert('Super! Du hast das Wort erraten!'), 200 * GUESS_LENGTH)
+      setTimeout(() => emit('snackbar', { message: 'Super! Du hast das Wort erraten!', type: 'success' }), 200 * GUESS_LENGTH)
     } else if (guesses.value.length === MAX_GUESSES) {
       setTimeout(
-        () => alert(`Spiel vorbei! Das Wort war "${solution.value.toUpperCase()}".`),
+        () => emit('snackbar', { message: `Spiel vorbei! Das Wort war "${solution.value.toUpperCase()}".`, type: 'info' }),
         200 * GUESS_LENGTH
       )
     }
@@ -112,7 +112,7 @@ async function submitGuess() {
     currentGuess.value = ''
   } catch (error) {
     console.error('Fehler beim Abgeben des Rateversuchs:', error)
-    alert('Fehler beim Abgeben des Rateversuchs: ' + (error.error || error.message))
+    emit('snackbar', { message: 'Fehler beim Abgeben des Rateversuchs: ' + (error.error || error.message), type: 'error' })
   }
 }
 
@@ -172,18 +172,15 @@ onMounted(async () => {
         guessedBy.value.push({ user, guess: guessUpper })
       }
     }
-    // Score-Update für andere Spieler ignorieren, nur eigenen Score anzeigen
   })
   
   onNewRound((data) => {
-    console.log('Neue Runde gestartet:', data)
     guesses.value = []
     guessedBy.value = []
     currentGuess.value = ''
     keyboardColors.value = {}
-    roundScore.value = 0 // Score bei neuer Runde zurücksetzen
+    roundScore.value = 0
     
-    // Letztes Wort anzeigen wenn verfügbar
     if (data.lastWord) {
       lastRoundSolution.value = data.lastWord
     } else {
@@ -201,18 +198,13 @@ onMounted(async () => {
   
   onRoundEnded((data) => {
     const solutionUpper = data.solution.toUpperCase()
-    if (!guesses.value.includes(solutionUpper)) {
-      guesses.value.push(solutionUpper)
-      guessedBy.value.push({ user: 'Lösung', guess: solutionUpper })
-    }
-    // ECHTE Punkte vom Server übernehmen!
+    // NICHT ins Grid pushen!
     if (data.playerScores && data.playerScores[props.user.user]) {
       roundScore.value = data.playerScores[props.user.user].roundScore
     }
-    alert(`Runde beendet! Das Wort war: ${solutionUpper}`)
+    emit('snackbar', { message: `Runde beendet! Das Wort war: ${solutionUpper}`, type: 'info' })
   })
 
-  // Score nach jedem Guess vom Server übernehmen
   onEvent('guess', (data) => {
     if (data.user === props.user.user) {
       roundScore.value = data.score
@@ -220,24 +212,20 @@ onMounted(async () => {
   })
   
   onSync((data) => {
-    console.log('Spielzustand synchronisiert:', data)
     timer.value = data.secondsLeft
   })
   
   onError((data) => {
-    console.error('WebSocket Fehler:', data.message)
-    alert('Fehler: ' + data.message)
+    emit('snackbar', { message: 'Fehler: ' + data.message, type: 'error' })
   })
   
   onPlayerList((data) => {
-    console.log('Spielerliste aktualisiert:', data.players)
     connectedUsers.value = data.players.map(p => p.name)
   })
   
   onTimerUpdate((data) => {
     timer.value = data.secondsLeft
 
-    // Lokalen Countdown neu starten
     if (localTimerInterval) clearInterval(localTimerInterval)
     localTimerInterval = setInterval(() => {
       if (timer.value > 0) {
@@ -247,18 +235,15 @@ onMounted(async () => {
   })
   
   onUserJoined((data) => {
-    console.log('User beigetreten:', data.username)
     if (!connectedUsers.value.includes(data.username)) {
       connectedUsers.value.push(data.username)
     }
   })
   
   onUserLeft((data) => {
-    console.log('User verlassen:', data.username)
     connectedUsers.value = connectedUsers.value.filter(u => u !== data.username)
   })
   
-  // correctGuess-Event verarbeiten
   onEvent('correctGuess', (data) => {
     const wordUpper = data.word.toUpperCase()
     if (!guesses.value.includes(wordUpper)) {
@@ -266,16 +251,15 @@ onMounted(async () => {
       guessedBy.value.push({ user: data.user, guess: wordUpper })
     }
     solution.value = wordUpper
+    emit('snackbar', { message: `${data.user} hat das Wort erraten!`, type: 'success' })
   })
 
-  // Spielzustand-Event verarbeiten
   onEvent('gameState', (data) => {
     if (data.currentWord) solution.value = data.currentWord.toUpperCase()
     if (Array.isArray(data.guesses)) guesses.value = data.guesses.map(g => g.guess.toUpperCase ? g.guess.toUpperCase() : g.guess)
     if (Array.isArray(data.guesses)) guessedBy.value = data.guesses.map(g => ({ user: g.user, guess: g.guess.toUpperCase ? g.guess.toUpperCase() : g.guess }))
     if (typeof data.timeRemaining === 'number') timer.value = data.timeRemaining
     if (typeof data.lastWord === 'string') lastRoundSolution.value = data.lastWord ? data.lastWord.toUpperCase() : ''
-    // Spieler-Liste IMMER aktualisieren!
     if (Array.isArray(data.players)) connectedUsers.value = data.players.map(p => p.name)
     keyboardColors.value = {}
     guesses.value.forEach(g => updateKeyboardColors(g))
@@ -316,7 +300,6 @@ onUnmounted(() => {
           <span>TIMER: <span id="timer-display">{{ timer }}</span></span>
         </div>
 
-        <!-- currentGuess wird nur übergeben, wenn canMakeGuess true ist -->
         <GameGrid :guesses="guesses" :currentGuess="canMakeGuess ? currentGuess : ''" :solution="solution" />
         <Keyboard
           @add="addLetter"
