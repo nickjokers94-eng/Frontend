@@ -1,6 +1,9 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { getHighscoresAPI, setUserActiveAPI, deleteUserAPI, changePasswordAPI, getUsersAPI, updateUserRoleAPI, addWordAPI } from './api.js'
+import { 
+  getHighscoresAPI, setUserActiveAPI, deleteUserAPI, changePasswordAPI, getUsersAPI, 
+  updateUserRoleAPI, addWordAPI, getWordsAPI, deleteWordByInputAPI 
+} from './api.js'
 import GameScreen from './components/gamescreen.vue'
 import StartScreen from './components/startscreen.vue'
 
@@ -24,10 +27,17 @@ const adminError = ref('')
 // Für Rollenänderung: Temporäre Rollen pro User speichern
 const tempRoles = ref({})
 
-// Wörter hinzufügen
+// Wörter hinzufügen/löschen
 const newWord = ref('')
 const wordMessage = ref('')
 const wordError = ref('')
+const deleteWordInput = ref('')
+const deleteWordMessage = ref('')
+const deleteWordError = ref('')
+
+// Wortliste für Admin-UI (optional, falls du die Liste anzeigen willst)
+const wordList = ref([])
+const wordListError = ref('')
 
 // Passwort-Ändern-Zustand
 const oldPassword = ref('')
@@ -133,12 +143,23 @@ async function deleteSelectedUsers() {
   }
 }
 
+async function loadWordList() {
+  try {
+    const result = await getWordsAPI(currentUser.value.user)
+    wordList.value = result.data
+    wordListError.value = ''
+  } catch (err) {
+    wordListError.value = err.error || err
+  }
+}
+
 function openAdminPanel() {
   activeScreen.value = 'admin'
   selectedUserIds.value = new Set()
   adminMessage.value = ''
   adminError.value = ''
   loadPendingUsers()
+  loadWordList()
 }
 
 async function updateRole(user) {
@@ -162,8 +183,26 @@ async function addWord() {
     await addWordAPI(currentUser.value.user, newWord.value)
     wordMessage.value = 'Wort erfolgreich hinzugefügt!'
     newWord.value = ''
+    await loadWordList()
   } catch (err) {
     wordError.value = err.error || 'Fehler beim Hinzufügen des Wortes'
+  }
+}
+
+async function deleteWordByInput() {
+  deleteWordMessage.value = ''
+  deleteWordError.value = ''
+  if (!deleteWordInput.value || deleteWordInput.value.length !== 5) {
+    deleteWordError.value = 'Das Wort muss genau 5 Buchstaben haben.'
+    return
+  }
+  try {
+    await deleteWordByInputAPI(currentUser.value.user, deleteWordInput.value)
+    deleteWordMessage.value = 'Wort erfolgreich gelöscht!'
+    deleteWordInput.value = ''
+    await loadWordList()
+  } catch (err) {
+    deleteWordError.value = err.error || 'Fehler beim Löschen des Wortes'
   }
 }
 
@@ -307,6 +346,25 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
         <button @click="addWord" style="margin-left:8px;">Hinzufügen</button>
         <div v-if="wordMessage" style="color:green; margin-top:8px;">{{ wordMessage }}</div>
         <div v-if="wordError" style="color:red; margin-top:8px;">{{ wordError }}</div>
+
+        <h4 style="margin-top:24px;">WORT LÖSCHEN</h4>
+        <input
+          v-model="deleteWordInput"
+          maxlength="5"
+          placeholder="Wort zum Löschen"
+          style="width: 80%; font-size: 1.2rem; padding: 8px; margin-bottom: 8px;"
+        />
+        <button @click="deleteWordByInput" style="margin-left:8px;">Löschen</button>
+        <div v-if="deleteWordMessage" style="color:green; margin-top:8px;">{{ deleteWordMessage }}</div>
+        <div v-if="deleteWordError" style="color:red; margin-top:8px;">{{ deleteWordError }}</div>
+
+        <h4 style="margin-top:24px;">WORTLISTE</h4>
+        <div v-if="wordListError" style="color:red;">{{ wordListError }}</div>
+        <ul style="list-style:none; padding:0;">
+          <li v-for="wordObj in wordList" :key="wordObj.id" style="margin-bottom:8px;">
+            <span style="font-family:monospace; font-size:1.1em;">{{ wordObj.word }}</span>
+          </li>
+        </ul>
       </div>
     </main>
     <button class="close-btn" @click="activeScreen = 'game'">ADMIN BEREICH SCHLIESSEN</button>

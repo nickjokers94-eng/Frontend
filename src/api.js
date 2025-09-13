@@ -186,6 +186,9 @@ export async function addWordAPI(adminUser, word) {
     if (!word || word.length !== 5) {
         throw { success: false, error: 'Wort muss genau 5 Buchstaben haben.' };
     }
+    if (!/^[A-Za-zÄÖÜäöüß]+$/.test(word)) {
+        throw { success: false, error: 'Nur Buchstaben (keine Zahlen/Sonderzeichen) erlaubt.' };
+    }
     const result = await apiCall('/words/addWord', 'POST', { word });
     if (result.data === false) {
         throw { success: false, error: 'Das Wort existiert bereits.' };
@@ -507,15 +510,18 @@ export async function updateUserRoleAPI(adminUser, targetUser, newRole) {
  * @param {string} wordId - ID des zu löschenden Worts
  * @returns {Promise<object>}
  */
-export async function deleteWordAPI(adminUser, wordId) {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve({
-                success: true,
-                message: 'Wort erfolgreich gelöscht'
-            });
-        }, 400);
-    });
+export async function deleteWordByInputAPI(adminUser, word) {
+    if (!word || word.length !== 5) {
+        throw { success: false, error: 'Wort muss genau 5 Buchstaben haben.' };
+    }
+    const result = await apiCall('/words/deleteWord', 'DELETE', { word });
+    if (result.data === false) {
+        throw { success: false, error: 'Das Wort existiert nicht.' };
+    }
+    return {
+        success: true,
+        message: 'Wort erfolgreich gelöscht.'
+    };
 }
 
 /**
