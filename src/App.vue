@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { getHighscoresAPI, setUserActiveAPI, deleteUserAPI, changePasswordAPI, getUsersAPI, updateUserRoleAPI } from './api.js'
+import { getHighscoresAPI, setUserActiveAPI, deleteUserAPI, changePasswordAPI, getUsersAPI, updateUserRoleAPI, addWordAPI } from './api.js'
 import GameScreen from './components/gamescreen.vue'
 import StartScreen from './components/startscreen.vue'
 
@@ -23,6 +23,11 @@ const adminError = ref('')
 
 // Für Rollenänderung: Temporäre Rollen pro User speichern
 const tempRoles = ref({})
+
+// Wörter hinzufügen
+const newWord = ref('')
+const wordMessage = ref('')
+const wordError = ref('')
 
 // Passwort-Ändern-Zustand
 const oldPassword = ref('')
@@ -143,6 +148,22 @@ async function updateRole(user) {
     await loadPendingUsers()
   } catch (err) {
     adminError.value = err.error || err
+  }
+}
+
+async function addWord() {
+  wordMessage.value = ''
+  wordError.value = ''
+  if (!newWord.value || newWord.value.length !== 5) {
+    wordError.value = 'Das Wort muss genau 5 Buchstaben haben.'
+    return
+  }
+  try {
+    await addWordAPI(currentUser.value.user, newWord.value)
+    wordMessage.value = 'Wort erfolgreich hinzugefügt!'
+    newWord.value = ''
+  } catch (err) {
+    wordError.value = err.error || 'Fehler beim Hinzufügen des Wortes'
   }
 }
 
@@ -276,8 +297,16 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
         </div>
       </div>
       <div class="box">
-        <h3>WÖRTER BEARBEITEN</h3>
-        <textarea placeholder="Wortliste bearbeiten..."></textarea>
+        <h3>WÖRTER HINZUFÜGEN</h3>
+        <input
+          v-model="newWord"
+          maxlength="5"
+          placeholder="Wort hinzufügen"
+          style="width: 80%; font-size: 1.2rem; padding: 8px; margin-bottom: 8px;"
+        />
+        <button @click="addWord" style="margin-left:8px;">Hinzufügen</button>
+        <div v-if="wordMessage" style="color:green; margin-top:8px;">{{ wordMessage }}</div>
+        <div v-if="wordError" style="color:red; margin-top:8px;">{{ wordError }}</div>
       </div>
     </main>
     <button class="close-btn" @click="activeScreen = 'game'">ADMIN BEREICH SCHLIESSEN</button>
