@@ -77,16 +77,14 @@ export async function registerAPI(username, password) {
         throw { success: false, error: 'Passwort zu kurz (min. 3 Zeichen).' };
     }
 
-    try {
-        // requiresAuth = false für Registrierung!
-        const result = await apiCall('/user/register', 'POST', { username, password }, false);
-        return {
-            success: true,
-            message: 'Registrierung erfolgreich. Bitte warte auf Admin-Freischaltung.'
-        };
-    } catch (error) {
-        throw error;
+    const result = await apiCall('/user/register', 'POST', { username, password }, false);
+    if (result.data === false) {
+        throw { success: false, error: 'Benutzername existiert bereits.' };
     }
+    return {
+        success: true,
+        message: 'Registrierung erfolgreich. Bitte warte auf Admin-Freischaltung.'
+    };
 }
 
 /**
@@ -438,7 +436,7 @@ export async function getUsersAPI(adminUser) {
     try {
         const result = await apiCall('/user/lockedUsers', 'GET');
         const formattedUsers = result.data.map(entry => ({
-            id: entry.userid?.toString() || entry.id?.toString() || '', // Fallback falls id anders heißt
+            id: entry.userid?.toString() || entry.username, // Username als Fallback!
             user: entry.username,
             role: entry.role,
             active: entry.status === 'active'

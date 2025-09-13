@@ -1,11 +1,11 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { getHighscoresAPI, setUserActiveAPI, deleteUserAPI, changePasswordAPI, getUsersAPI, startRoundAPI, endRoundAPI } from './api.js'
+import { getHighscoresAPI, setUserActiveAPI, deleteUserAPI, changePasswordAPI, getUsersAPI } from './api.js'
 import GameScreen from './components/gamescreen.vue'
 import StartScreen from './components/startscreen.vue'
 
 // --- Zustandsverwaltung ---
-const activeScreen = ref('start') // 'start', 'game', 'change-password', 'admin'
+const activeScreen = ref('start')
 const currentUser = ref(null)
 
 // Highscore-Modal-Zustand
@@ -17,7 +17,7 @@ const showHelpModal = ref(false)
 
 // Admin-Zustand
 const pendingUsers = ref([]) // Benutzer die auf Freischaltung warten
-const selectedUsers = ref([]) // Ausgewählte Benutzer für Freischaltung/Löschung
+const selectedUserIds = ref(new Set()) // IDs der ausgewählten Benutzer
 const adminMessage = ref('')
 const adminError = ref('')
 
@@ -73,47 +73,48 @@ async function loadPendingUsers() {
 }
 
 function toggleUserSelection(user) {
-  const index = selectedUsers.value.findIndex(u => u.id === user.id)
-  if (index > -1) {
-    selectedUsers.value.splice(index, 1)
+  if (selectedUserIds.value.has(user.id)) {
+    selectedUserIds.value.delete(user.id)
+    selectedUserIds.value = new Set(selectedUserIds.value)
   } else {
-    selectedUsers.value.push(user)
+    selectedUserIds.value.add(user.id)
+    selectedUserIds.value = new Set(selectedUserIds.value)
   }
 }
 
 async function activateSelectedUsers() {
-  if (selectedUsers.value.length === 0) {
+  if (selectedUserIds.value.size === 0) {
     adminError.value = 'Keine Benutzer ausgewählt'
     return
   }
-  
   try {
-    for (const user of selectedUsers.value) {
-      await setUserActiveAPI(currentUser.value.user, user.user, true)
-    }
-    adminMessage.value = `${selectedUsers.value.length} Benutzer wurden freigeschaltet`
+    const usersToActivate = pendingUsers.value.filter(u => selectedUserIds.value.has(u.id))
+    await Promise.all(usersToActivate.map(user =>
+      setUserActiveAPI(currentUser.value.user, user.user, true)
+    ))
+    adminMessage.value = `${usersToActivate.length} Benutzer wurden freigeschaltet`
     adminError.value = ''
-    selectedUsers.value = []
-    await loadPendingUsers() // Liste neu laden
+    selectedUserIds.value = new Set()
+    await loadPendingUsers()
   } catch (err) {
     adminError.value = err.error || err
   }
 }
 
 async function deleteSelectedUsers() {
-  if (selectedUsers.value.length === 0) {
+  if (selectedUserIds.value.size === 0) {
     adminError.value = 'Keine Benutzer ausgewählt'
     return
   }
-  
   try {
-    for (const user of selectedUsers.value) {
-      await deleteUserAPI(currentUser.value.user, user.user)
-    }
-    adminMessage.value = `${selectedUsers.value.length} Benutzer wurden gelöscht`
+    const usersToDelete = pendingUsers.value.filter(u => selectedUserIds.value.has(u.id))
+    await Promise.all(usersToDelete.map(user =>
+      deleteUserAPI(currentUser.value.user, user.user)
+    ))
+    adminMessage.value = `${usersToDelete.length} Benutzer wurden gelöscht`
     adminError.value = ''
-    selectedUsers.value = []
-    await loadPendingUsers() // Liste neu laden
+    selectedUserIds.value = new Set()
+    await loadPendingUsers()
   } catch (err) {
     adminError.value = err.error || err
   }
@@ -121,7 +122,7 @@ async function deleteSelectedUsers() {
 
 function openAdminPanel() {
   activeScreen.value = 'admin'
-  selectedUsers.value = []
+  selectedUserIds.value = new Set()
   adminMessage.value = ''
   adminError.value = ''
   loadPendingUsers()
@@ -157,7 +158,6 @@ async function changePassword() {
   }
 }
 
-// Computed-Eigenschaft zur Überprüfung ob ein Benutzer angemeldet ist
 const isLoggedIn = computed(() => activeScreen.value !== 'start')
 </script>
 
@@ -216,8 +216,8 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
   <!-- Admin-Bildschirm -->
   <section v-if="activeScreen === 'admin'" class="screen">
     <header>
-      <button @click="activateSelectedUsers" :disabled="selectedUsers.length === 0">Freischalten</button>
-      <button @click="deleteSelectedUsers" :disabled="selectedUsers.length === 0" class="delete-btn">Löschen</button>
+      <button @click="activateSelectedUsers" :disabled="selectedUserIds.size === 0">Freischalten</button>
+      <button @click="deleteSelectedUsers" :disabled="selectedUserIds.size === 0" class="delete-btn">Löschen</button>
     </header>
     
     <div v-if="adminMessage" class="admin-message success">{{ adminMessage }}</div>
@@ -235,12 +235,12 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
               v-for="user in pendingUsers" 
               :key="user.id" 
               class="user-item"
-              :class="{ 'selected': selectedUsers.some(u => u.id === user.id) }"
-              @click="toggleUserSelection(user)"
+              :class="{ 'selected': selectedUserIds.has(user.id) }"
             >
               <input 
                 type="checkbox" 
-                :checked="selectedUsers.some(u => u.id === user.id)"
+                :checked="selectedUserIds.has(user.id)"
+                @change="toggleUserSelection(user)"
                 @click.stop
               />
               <span class="username">{{ user.user }}</span>
