@@ -489,6 +489,17 @@ export async function updateUserAPI(adminUser, targetUser, updates) {
         }, 400);
     });
 }
+export async function updateUserRoleAPI(adminUser, targetUser, newRole) {
+    try {
+        const result = await apiCall('/user/updateRole', 'PUT', { username: targetUser, role: newRole });
+        return {
+            success: true,
+            message: 'Rolle aktualisiert.'
+        };
+    } catch (error) {
+        throw error;
+    }
+}
 
 // === WORTLISTE-APIs ===
 

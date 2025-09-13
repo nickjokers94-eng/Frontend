@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { getHighscoresAPI, setUserActiveAPI, deleteUserAPI, changePasswordAPI, getUsersAPI } from './api.js'
+import { getHighscoresAPI, setUserActiveAPI, deleteUserAPI, changePasswordAPI, getUsersAPI, updateUserRoleAPI } from './api.js'
 import GameScreen from './components/gamescreen.vue'
 import StartScreen from './components/startscreen.vue'
 
@@ -20,6 +20,9 @@ const pendingUsers = ref([]) // Benutzer die auf Freischaltung warten
 const selectedUserIds = ref(new Set()) // IDs der ausgewählten Benutzer
 const adminMessage = ref('')
 const adminError = ref('')
+
+// Für Rollenänderung: Temporäre Rollen pro User speichern
+const tempRoles = ref({})
 
 // Passwort-Ändern-Zustand
 const oldPassword = ref('')
@@ -66,6 +69,11 @@ async function loadPendingUsers() {
   try {
     const response = await getUsersAPI(currentUser.value.user)
     pendingUsers.value = response.data.filter(user => !user.active)
+    // tempRoles initialisieren
+    tempRoles.value = {}
+    for (const user of pendingUsers.value) {
+      tempRoles.value[user.id] = user.role
+    }
     adminError.value = ''
   } catch (err) {
     adminError.value = err.error || err
@@ -126,6 +134,16 @@ function openAdminPanel() {
   adminMessage.value = ''
   adminError.value = ''
   loadPendingUsers()
+}
+
+async function updateRole(user) {
+  try {
+    await updateUserRoleAPI(currentUser.value.user, user.user, tempRoles.value[user.id])
+    adminMessage.value = `Rolle für ${user.user} geändert`
+    await loadPendingUsers()
+  } catch (err) {
+    adminError.value = err.error || err
+  }
 }
 
 async function changePassword() {
@@ -244,7 +262,15 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
                 @click.stop
               />
               <span class="username">{{ user.user }}</span>
-              <span class="user-info">(Rolle: {{ user.role }})</span>
+              <span class="user-info">
+                (Rolle: 
+                <select v-model="tempRoles[user.id]" style="margin-left:4px;">
+                  <option value="user">user</option>
+                  <option value="admin">admin</option>
+                </select>
+                <button @click="updateRole(user)" style="margin-left:6px;">Eintragen</button>
+                )
+              </span>
             </div>
           </div>
         </div>
