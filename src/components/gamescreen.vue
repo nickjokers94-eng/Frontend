@@ -316,7 +316,7 @@ onUnmounted(() => {
           <span>TIMER: <span id="timer-display">{{ timer }}</span></span>
         </div>
 
-        <!-- WICHTIG: currentGuess wird nur übergeben, wenn canMakeGuess true ist -->
+        <!-- currentGuess wird nur übergeben, wenn canMakeGuess true ist -->
         <GameGrid :guesses="guesses" :currentGuess="canMakeGuess ? currentGuess : ''" :solution="solution" />
         <Keyboard
           @add="addLetter"

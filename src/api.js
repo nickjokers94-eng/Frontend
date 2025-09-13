@@ -106,6 +106,9 @@ export async function loginAPI(username, password) {
         });
 
         if (!response.ok) {
+            if (response.status === 403) {
+                throw new Error('Warten Sie auf Freischaltung durch den Admin');
+            }
             if (response.status === 401) {
                 throw new Error('Ungültige Anmeldedaten');
             }
@@ -113,10 +116,6 @@ export async function loginAPI(username, password) {
         }
 
         const result = await response.json();
-        if (!result || !result.username) {
-            throw new Error('Ungültige Anmeldedaten');
-        }
-
         return {
             success: true,
             data: {
@@ -436,18 +435,21 @@ export async function endRoundAPI(adminUser) {
  * @returns {Promise<object>}
  */
 export async function getUsersAPI(adminUser) {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve({
-                success: true,
-                data: [
-                    { id: '1', user: 'pendingUser1', role: 'user', active: false, email: 'user1@test.com' },
-                    { id: '2', user: 'pendingUser2', role: 'user', active: false, email: 'user2@test.com' },
-                    { id: '3', user: 'activeUser1', role: 'user', active: true, email: 'active@test.com' }
-                ]
-            });
-        }, 300);
-    });
+    try {
+        const result = await apiCall('/user/lockedUsers', 'GET');
+        const formattedUsers = result.data.map(entry => ({
+            id: entry.userid?.toString() || entry.id?.toString() || '', // Fallback falls id anders heißt
+            user: entry.username,
+            role: entry.role,
+            active: entry.status === 'active'
+        }));
+        return {
+            success: true,
+            data: formattedUsers
+        };
+    } catch (error) {
+        throw error;
+    }
 }
 
 /**

@@ -218,7 +218,6 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
     <header>
       <button @click="activateSelectedUsers" :disabled="selectedUsers.length === 0">Freischalten</button>
       <button @click="deleteSelectedUsers" :disabled="selectedUsers.length === 0" class="delete-btn">Löschen</button>
-      <button @click="loadPendingUsers" style="margin-left:16px;">Aktualisieren</button>
     </header>
     
     <div v-if="adminMessage" class="admin-message success">{{ adminMessage }}</div>
