@@ -14,7 +14,10 @@ import {
   onUserJoined,
   onUserLeft,
   isConnected,
-  onEvent
+  onEvent,
+  onSync,
+  onError,
+  onPlayerList
 } from '../ws.js'
 
 const props = defineProps({
@@ -31,12 +34,10 @@ const currentGuess = ref('')
 const keyboardColors = ref({})
 const guessedBy = ref([]) // Array für Rateversuche mit Benutzername: [{user: 'Name', guess: 'wort'}]
 const connectedUsers = ref([]) // Liste der verbundenen Spieler
-const connectionStatus = ref('DISCONNECTED')
 const timer = ref(60)
 let localTimerInterval = null
 
-const currentPlayer = ref(null)
-const currentPlayerTurn = ref(null)
+const lastRoundSolution = ref('')
 
 const isGameOver = computed(
   () => guesses.value.length === MAX_GUESSES || guesses.value.includes(solution.value)
@@ -56,9 +57,7 @@ const playerGuessCount = computed(() => {
 })
 
 const canMakeGuess = computed(() => {
-  return playerGuessCount.value < maxGuessesForPlayer.value &&
-         !isGameOver.value &&
-         currentPlayerTurn.value === props.user.user
+  return playerGuessCount.value < maxGuessesForPlayer.value && !isGameOver.value
 })
 
 function getPlayerGuessCount(username) {
@@ -144,7 +143,7 @@ function handleKeyPress(e) {
 
 let ws
 
-  onMounted(async () => {
+onMounted(async () => {
   try {
     const response = await getNewSolutionWordAPI()
     solution.value = response.data.word.toUpperCase()
@@ -158,18 +157,18 @@ let ws
   ws = connectWebSocket('ws://localhost:3000', props.user.user)
   
   onGuessSubmitted((data) => {
-  const { guess, user } = data
+    const { guess, user } = data
 
-  const guessUpper = guess.toUpperCase()
-  if (user !== props.user.user) {
-    if (!guesses.value.includes(guessUpper)) {
-      guesses.value.push(guessUpper)
+    const guessUpper = guess.toUpperCase()
+    if (user !== props.user.user) {
+      if (!guesses.value.includes(guessUpper)) {
+        guesses.value.push(guessUpper)
+      }
+      if (!guessedBy.value.some(g => g.user === user && g.guess === guessUpper)) {
+        guessedBy.value.push({ user, guess: guessUpper })
+      }
     }
-    if (!guessedBy.value.some(g => g.user === user && g.guess === guessUpper)) {
-      guessedBy.value.push({ user, guess: guessUpper })
-    }
-  }
-})
+  })
   
   onNewRound((data) => {
     console.log('Neue Runde gestartet:', data)
@@ -177,11 +176,12 @@ let ws
     guessedBy.value = []
     currentGuess.value = ''
     keyboardColors.value = {}
-    currentPlayer.value = data.currentPlayer || null
     
     // Letztes Wort anzeigen wenn verfügbar
     if (data.lastWord) {
       lastRoundSolution.value = data.lastWord
+    } else {
+      lastRoundSolution.value = ''
     }
     
     if (data.word) {
@@ -243,14 +243,14 @@ let ws
   
   // NEU: correctGuess-Event verarbeiten
   onEvent('correctGuess', (data) => {
-  const wordUpper = data.word.toUpperCase()
-  if (!guesses.value.includes(wordUpper)) {
-    guesses.value.push(wordUpper)
-    guessedBy.value.push({ user: data.user, guess: wordUpper })
-  }
-  solution.value = wordUpper
-  // ...alert wie oben...
-})
+    const wordUpper = data.word.toUpperCase()
+    if (!guesses.value.includes(wordUpper)) {
+      guesses.value.push(wordUpper)
+      guessedBy.value.push({ user: data.user, guess: wordUpper })
+    }
+    solution.value = wordUpper
+    // ...alert wie oben...
+  })
 
   // NEU: Spielzustand-Event verarbeiten
   onEvent('gameState', (data) => {
@@ -259,24 +259,13 @@ let ws
     if (Array.isArray(data.guesses)) guesses.value = data.guesses.map(g => g.guess.toUpperCase ? g.guess.toUpperCase() : g.guess)
     if (Array.isArray(data.guesses)) guessedBy.value = data.guesses.map(g => ({ user: g.user, guess: g.guess.toUpperCase ? g.guess.toUpperCase() : g.guess }))
     if (typeof data.timeRemaining === 'number') timer.value = data.timeRemaining
-    if (typeof data.roundNumber === 'number') lastRoundSolution.value = data.lastWord ? data.lastWord.toUpperCase() : ''
+    if (typeof data.lastWord === 'string') lastRoundSolution.value = data.lastWord ? data.lastWord.toUpperCase() : ''
     // Optional: Spieler-Liste aktualisieren
     if (Array.isArray(data.players)) connectedUsers.value = data.players.map(p => p.name)
     // Tastaturfarben ggf. neu berechnen
     keyboardColors.value = {}
     guesses.value.forEach(g => updateKeyboardColors(g))
   })
-  
-  onEvent('turnUpdate', (data) => {
-    currentPlayerTurn.value = data.currentPlayer
-  })
-  onNewRound((data) => {
-    currentPlayerTurn.value = data.currentPlayer || null
-  })
-
-  setInterval(() => {
-    connectionStatus.value = isConnected() ? 'CONNECTED' : 'DISCONNECTED'
-  }, 1000)
 })
 
 onUnmounted(() => {
@@ -311,18 +300,6 @@ onUnmounted(() => {
         <div id="game-info">
           <span>VERSUCHE: <span>{{ playerGuessCount }}/{{ maxGuessesForPlayer }}</span></span>
           <span>TIMER: <span id="timer-display">{{ timer }}</span></span>
-          <span class="connection-status" :class="connectionStatus.toLowerCase()">
-            {{ connectionStatus === 'CONNECTED' ? '🟢' : '🔴' }} {{ connectionStatus }}
-          </span>
-        </div>
-
-        <div class="turn-info" style="margin-bottom: 10px;">
-          <span v-if="currentPlayer">
-            <strong>Zug:</strong>
-            <span :style="{ color: currentPlayer === user.user ? '#6aaa64' : '#b59f3b' }">
-              {{ currentPlayer === user.user ? 'Du bist dran!' : currentPlayer + ' ist dran' }}
-            </span>
-          </span>
         </div>
 
         <GameGrid :guesses="guesses" :currentGuess="currentGuess" :solution="solution" />
