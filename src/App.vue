@@ -63,7 +63,7 @@ function handleLogout() {
 }
 
 async function openHighscore() {
-  const response = await getHighscoresAPI()
+  const response = await getHighscoresAPI(currentUser.value?.user)
   highscores.value = response.data
   showHighscoreModal.value = true
 }
@@ -177,6 +177,10 @@ async function addWord() {
   wordError.value = ''
   if (!newWord.value || newWord.value.length !== 5) {
     wordError.value = 'Das Wort muss genau 5 Buchstaben haben.'
+    return
+  }
+  if (!/^[A-Za-zÄÖÜäöüß]+$/.test(newWord.value)) {
+    wordError.value = 'Nur Buchstaben (keine Zahlen/Sonderzeichen) erlaubt.'
     return
   }
   try {
@@ -383,10 +387,17 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
           </tr>
         </thead>
         <tbody>
-          <tr v-for="score in highscores" :key="score.rank" 
-              :class="{ 'current-player': score.name === currentUser?.user }">
+          <tr 
+            v-for="score in highscores" 
+            :key="score.rank + '-' + score.name"
+            :class="{ 'current-player': score.name === currentUser?.user }"
+          >
             <td>{{ score.rank }}</td>
-            <td>{{ score.name }}</td>
+            <td>
+              <span :style="{ fontWeight: score.name === currentUser?.user ? 'bold' : 'normal' }">
+                {{ score.name }}
+              </span>
+            </td>
             <td>{{ score.score }}</td>
           </tr>
         </tbody>
@@ -452,6 +463,10 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
   padding: 2px 8px;
   min-width: 0;
   margin-top: 10px;
+}
+#highscore-table tr.current-player {
+  background-color: #e7f3ff;
+  font-weight: bold;
 }
 @media (max-width: 900px) {
   .help-modal-content {

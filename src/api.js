@@ -135,19 +135,33 @@ export async function loginAPI(username, password) {
  * Highscore-Liste abrufen
  * @returns {Promise<object>}
  */
-export async function getHighscoresAPI() {
+export async function getHighscoresAPI(currentUserName = null) {
     try {
-        const result = await apiCall('/highscores', 'GET');
-        const formattedHighscores = result.data.map((entry, index) => ({
-            rank: index + 1,
-            name: entry.username,
-            score: entry.score,
-            date: '2024-05-20'
-        }));
-        
+        const result = await apiCall('/highscores/all', 'GET');
+        // Sortiere nach Score absteigend
+        const sorted = result.data
+            .map(entry => ({
+                name: entry.username,
+                score: entry.score
+            }))
+            .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+        // Füge Rang hinzu
+        sorted.forEach((entry, idx) => entry.rank = idx + 1);
+        // Top 10
+        const top10 = sorted.slice(0, 10);
+        // Eigener Rang suchen
+        let ownEntry = null;
+        if (currentUserName) {
+            ownEntry = sorted.find(entry => entry.name === currentUserName);
+        }
+        // Wenn eigener Rang nicht in Top 10, füge ihn ans Ende an
+        let highscoresToShow = [...top10];
+        if (ownEntry && !top10.some(entry => entry.name === ownEntry.name)) {
+            highscoresToShow.push({ ...ownEntry, isOwn: true });
+        }
         return {
             success: true,
-            data: formattedHighscores
+            data: highscoresToShow
         };
     } catch (error) {
         throw error;
