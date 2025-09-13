@@ -12,6 +12,9 @@ const currentUser = ref(null)
 const showHighscoreModal = ref(false)
 const highscores = ref([])
 
+// Hilfe-Modal-Zustand
+const showHelpModal = ref(false)
+
 // Admin-Zustand
 const pendingUsers = ref([]) // Benutzer die auf Freischaltung warten
 const selectedUsers = ref([]) // Ausgewählte Benutzer für Freischaltung/Löschung
@@ -49,6 +52,13 @@ async function openHighscore() {
 
 function closeHighscore() {
   showHighscoreModal.value = false
+}
+
+function openHelp() {
+  showHelpModal.value = true
+}
+function closeHelp() {
+  showHelpModal.value = false
 }
 
 async function loadPendingUsers() {
@@ -160,7 +170,7 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
     class="header-logo"
   />
 
-    <!-- Start-Bildschirm -->
+  <!-- Start-Bildschirm -->
   <StartScreen 
     v-if="activeScreen === 'start'"
     @login-successful="handleLoginSuccess"
@@ -172,12 +182,11 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
     :user="currentUser"
     @logout="handleLogout"
     @show-highscore="openHighscore"
-    @show-change-password="() => activeScreen = 'change-password'"
+    @show-help="openHelp"
     @show-admin="openAdminPanel"
   />
 
   <!-- Passwort-Ändern-Bildschirm -->
-    <!-- Passwort-Ändern-Bildschirm -->
   <section v-if="activeScreen === 'change-password'" class="screen">
     <h1>Passwort ändern</h1>
     <form id="change-password-form" class="login-form" @submit.prevent="changePassword">
@@ -273,90 +282,69 @@ const isLoggedIn = computed(() => activeScreen.value !== 'start')
       <button class="close-btn" @click="closeHighscore">Schließen</button>
     </div>
   </div>
+
+  <!-- Hilfe-Modal -->
+  <div v-if="showHelpModal" class="modal">
+    <div class="modal-content help-modal-content">
+      <h2>Hilfe – Spielregeln & Bedienung</h2>
+      <h3>Spielregeln</h3>
+      <div class="help-section">
+        <p>
+          Errate ein Wort mit <strong>5 Buchstaben</strong>.<br>
+          Du hast eine begrenzte Anzahl an Versuchen:<br>
+          <strong>Alleine:</strong> 6 Versuche<br>
+          <strong>2 Spieler:</strong> 3 Versuche pro Spieler<br>
+          <strong>3 Spieler:</strong> 2 Versuche pro Spieler<br>
+        </p>
+        <p>
+          Nach jedem Versuch siehst du für jeden Buchstaben:<br>
+          <span style="color:#6aaa64;font-weight:bold;">Grün</span>: Richtiger Buchstabe an der richtigen Stelle<br>
+          <span style="color:#b59f3b;font-weight:bold;">Gelb</span>: Richtiger Buchstabe, aber an falscher Stelle<br>
+          <span style="color:#787c7e;font-weight:bold;">Grau</span>: Buchstabe kommt im Wort nicht vor
+        </p>
+        <p>
+          Das zuletzt gesuchte Wort wird zu Beginn jeder neuen Runde angezeigt.<br>
+          Jede Runde dauert maximal 60 Sekunden. Danach startet automatisch eine neue Runde.<br>
+          Punkte gibt es für richtige Lösungen – je schneller und mit weniger Versuchen, desto mehr Punkte!<br>
+          Die Highscore-Liste zeigt die besten Spieler.
+        </p>
+      </div>
+      <h3>Bedienung</h3>
+      <div class="help-section">
+        <p>
+          Gib dein Wort über die Bildschirm-Tastatur oder die PC-Tastatur ein.<br>
+          Mit <strong>Enter</strong> bestätigst du deinen Rateversuch.<br>
+          Mit <strong>Backspace</strong> kannst du Buchstaben löschen.<br>
+          Im Menü kannst du dich abmelden, dein Passwort ändern oder die Highscore-Liste ansehen.<br>
+          Admins können zusätzlich Benutzer und Wörter verwalten.
+        </p>
+      </div>
+      <button class="close-btn small-close-btn" @click="closeHelp">Schließen</button>
+    </div>
+  </div>
 </template>
 
-<style scoped>
-.admin-message {
-  padding: 10px;
-  margin-bottom: 15px;
-  border-radius: 6px;
-  font-weight: bold;
+<style>
+.help-modal-content {
+  max-width: 800px;
+  min-width: 400px;
+  font-size: 1.15rem;
+  line-height: 1.6;
 }
-
-.admin-message.success {
-  background-color: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
+.help-section p {
+  margin-bottom: 18px;
+  text-align: left;
 }
-
-.admin-message.error {
-  background-color: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+.small-close-btn {
+  font-size: 0.95rem;
+  padding: 2px 8px;
+  min-width: 0;
+  margin-top: 10px;
 }
-
-.pending-users {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.no-users {
-  text-align: center;
-  color: #6c757d;
-  font-style: italic;
-  padding: 20px;
-}
-
-.user-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  margin-bottom: 5px;
-  background: white;
-  border: 1px solid #d3d6da;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.user-item:hover {
-  background-color: #f8f9fa;
-  border-color: #007bff;
-}
-
-.user-item.selected {
-  background-color: #e3f2fd;
-  border-color: #2196f3;
-}
-
-.user-item input[type="checkbox"] {
-  margin-right: 10px;
-  cursor: pointer;
-}
-
-.username {
-  font-weight: bold;
-  color: #333;
-  margin-right: 8px;
-}
-
-.user-info {
-  font-size: 12px;
-  color: #6c757d;
-}
-
-.delete-btn {
-  background-color: #dc3545 !important;
-  color: white !important;
-}
-
-.delete-btn:hover {
-  background-color: #c82333 !important;
-}
-
-button:disabled {
-  background-color: #6c757d !important;
-  cursor: not-allowed !important;
-  opacity: 0.6;
+@media (max-width: 900px) {
+  .help-modal-content {
+    max-width: 98vw;
+    min-width: 0;
+  }
 }
 </style>

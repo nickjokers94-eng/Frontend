@@ -23,7 +23,7 @@ import {
 const props = defineProps({
   user: Object
 })
-const emit = defineEmits(['logout', 'showHighscore', 'showAdmin'])
+const emit = defineEmits(['logout', 'showHighscore', 'showAdmin', 'showHelp'])
 
 const GUESS_LENGTH = 5
 const MAX_GUESSES = 6
@@ -212,6 +212,13 @@ onMounted(async () => {
     alert(`Runde beendet! Das Wort war: ${solutionUpper}`)
   })
 
+  // Score nach jedem Guess vom Server übernehmen
+  onEvent('guess', (data) => {
+    if (data.user === props.user.user) {
+      roundScore.value = data.score
+    }
+  })
+  
   onSync((data) => {
     console.log('Spielzustand synchronisiert:', data)
     timer.value = data.secondsLeft
@@ -287,6 +294,7 @@ onUnmounted(() => {
     <header class="top-buttons">
       <button @click="emit('showHighscore')">HIGHSCORE ANZEIGEN</button>
       <button @click="emit('logout')">ABMELDEN</button>
+      <button @click="emit('showHelp')" title="Hilfe anzeigen">Spielregeln & Bedienung</button>
     </header>
 
     <hr class="button-divider" />
