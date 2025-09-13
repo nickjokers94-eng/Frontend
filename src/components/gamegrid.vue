@@ -1,18 +1,36 @@
 <script setup>
 import { computed } from 'vue'
 
+/**
+ * Props für die GameGrid-Komponente.
+ * @property {Array} guesses - Liste der abgegebenen Rateversuche
+ * @property {String} currentGuess - Aktueller Rateversuch
+ * @property {String} solution - Das Lösungswort
+ * Funktion: Übergibt die Spielstände und das Lösungswort an die Komponente.
+ * erstellt von: Nick Jokers
+ */
 const props = defineProps({
   guesses: Array,
   currentGuess: String,
   solution: String
 })
 
+// Maximale Wortlänge für das Spiel
 const GUESS_LENGTH = 5
+// Maximale Anzahl Versuche pro Runde
 const MAX_GUESSES = 6
 
+/**
+ * Berechnet die Anzeige der Spielsteine (Tiles) für das Grid.
+ * Keine Parameter.
+ * @returns {Array} 2D-Array mit Buchstaben und Status ('correct', 'present', 'wrong')
+ * Funktion: Erzeugt die Anzeige für alle bisherigen Rateversuche, den aktuellen Versuch und leere Zeilen.
+ * erstellt von: Nick Jokers
+ */
 const tiles = computed(() => {
   let allTiles = []
 
+  // Für jeden abgegebenen Rateversuch die Status berechnen
   props.guesses.forEach((guess) => {
     const row = []
     const solutionLetters = props.solution.split('')
@@ -20,6 +38,7 @@ const tiles = computed(() => {
     const tempSolution = [...solutionLetters]
     const statuses = Array(GUESS_LENGTH).fill('wrong')
 
+    // Erst richtige Buchstaben an richtiger Stelle markieren
     for (let i = 0; i < GUESS_LENGTH; i++) {
       if (guessLetters[i] === tempSolution[i]) {
         statuses[i] = 'correct'
@@ -27,6 +46,7 @@ const tiles = computed(() => {
       }
     }
 
+    // Dann Buchstaben markieren, die im Wort vorkommen, aber an anderer Stelle stehen
     for (let i = 0; i < GUESS_LENGTH; i++) {
       if (statuses[i] === 'correct') continue
 
@@ -37,6 +57,7 @@ const tiles = computed(() => {
       }
     }
 
+    // Zeile für das Grid aufbauen
     for (let i = 0; i < GUESS_LENGTH; i++) {
       row.push({ letter: guess[i], status: statuses[i] })
     }
@@ -52,6 +73,7 @@ const tiles = computed(() => {
     allTiles.push(currentRow)
   }
 
+  // Leere Zeilen auffüllen, bis MAX_GUESSES erreicht ist
   while (allTiles.length < MAX_GUESSES) {
     let emptyRow = []
     for (let i = 0; i < GUESS_LENGTH; i++) {

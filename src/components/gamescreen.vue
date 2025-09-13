@@ -20,32 +20,73 @@ import {
   onPlayerList
 } from '../ws.js'
 
+/**
+ * Props für die GameScreen-Komponente.
+ * @property {Object} user - Das eingeloggte Benutzerobjekt
+ * Funktion: Übergibt den aktuellen User an die Komponente.
+ * erstellt von: Nick Jokers
+ */
 const props = defineProps({
   user: Object
 })
+
+/**
+ * Emits für GameScreen-Events.
+ * @event logout - Wird ausgelöst, wenn sich der User abmeldet
+ * @event showHighscore - Zeigt das Highscore-Modal
+ * @event showAdmin - Öffnet den Admin-Bereich
+ * @event showHelp - Öffnet das Hilfe-Modal
+ * @event snackbar - Zeigt eine Snackbar-Nachricht an
+ * Funktion: Gibt Events an das Parent-Component weiter.
+ * erstellt von: Nick Jokers
+ */
 const emit = defineEmits(['logout', 'showHighscore', 'showAdmin', 'showHelp', 'snackbar'])
 
+// Maximale Wortlänge für das Spiel
 const GUESS_LENGTH = 5
+// Maximale Anzahl Versuche pro Runde
 const MAX_GUESSES = 6
 
+// Das aktuelle Lösungswort (Großbuchstaben)
 const solution = ref('')
-const guesses = ref([]) // Array abgegebener Rateversuche
+// Array abgegebener Rateversuche (Strings)
+const guesses = ref([])
+// Aktueller Rateversuch (String)
 const currentGuess = ref('')
+// Farben der Tasten (z.B. { A: 'correct', B: 'wrong' })
 const keyboardColors = ref({})
-const guessedBy = ref([]) // Array für Rateversuche mit Benutzername: [{user: 'Name', guess: 'wort'}]
-const connectedUsers = ref([]) // Liste der verbundenen Spieler
+// Array für Rateversuche mit Benutzername: [{user: 'Name', guess: 'wort'}]
+const guessedBy = ref([])
+// Liste der verbundenen Spieler
+const connectedUsers = ref([])
+// Timer für die aktuelle Runde (Sekunden)
 const timer = ref(60)
+// Intervall-ID für lokalen Timer
 let localTimerInterval = null
 
+// Das Lösungswort der letzten Runde
 const lastRoundSolution = ref('')
-const roundScore = ref(0) // aktueller Rundenscore
+// Aktueller Rundenscore des Spielers
+const roundScore = ref(0)
 
+/**
+ * Computed: true, wenn das Spiel vorbei ist (max. Versuche oder Wort erraten)
+ * erstellt von: Nick Jokers
+ */
 const isGameOver = computed(
   () => guesses.value.length === MAX_GUESSES || guesses.value.includes(solution.value)
 )
+
+/**
+ * Computed: Anzahl verbleibender Versuche
+ * erstellt von: Nick Jokers
+ */
 const remainingGuesses = computed(() => MAX_GUESSES - guesses.value.length)
 
-// Dynamische Versuche-Begrenzung basierend auf Spieleranzahl
+/**
+ * Computed: Dynamische Versuche-Begrenzung basierend auf Spieleranzahl
+ * erstellt von: Nick Jokers
+ */
 const maxGuessesForPlayer = computed(() => {
   const playerCount = connectedUsers.value.length
   if (playerCount <= 1) return 6      // Alleine: 6 Versuche
@@ -53,18 +94,40 @@ const maxGuessesForPlayer = computed(() => {
   return 2                             // 3+ Spieler: 2 Versuche
 })
 
+/**
+ * Computed: Anzahl der eigenen Rateversuche in dieser Runde
+ * erstellt von: Nick Jokers
+ */
 const playerGuessCount = computed(() => {
   return guessedBy.value.filter(g => g.user === props.user.user).length
 })
 
+/**
+ * Computed: true, wenn der Spieler noch raten darf
+ * erstellt von: Nick Jokers
+ */
 const canMakeGuess = computed(() => {
   return playerGuessCount.value < maxGuessesForPlayer.value && !isGameOver.value
 })
 
+/**
+ * Gibt die Anzahl der Rateversuche eines bestimmten Spielers zurück.
+ * @param {string} username - Benutzername
+ * @returns {number} Anzahl der Rateversuche
+ * Funktion: Zählt die Rateversuche für einen User.
+ * erstellt von: Nick Jokers
+ */
 function getPlayerGuessCount(username) {
   return guessedBy.value.filter(g => g.user === username).length
 }
 
+/**
+ * Gibt die maximale Anzahl Versuche für einen User zurück.
+ * @param {string} username - Benutzername
+ * @returns {number} Maximale Versuche
+ * Funktion: Berechnet die erlaubten Versuche je nach Spieleranzahl.
+ * erstellt von: Nick Jokers
+ */
 function getMaxGuessesForUser(username) {
   const playerCount = connectedUsers.value.length
   if (playerCount <= 1) return 6
@@ -72,16 +135,34 @@ function getMaxGuessesForUser(username) {
   return 2
 }
 
+/**
+ * Fügt einen Buchstaben zum aktuellen Rateversuch hinzu.
+ * @param {string} letter - Der Buchstabe
+ * Funktion: Ergänzt das aktuelle Wort, wenn noch Platz ist.
+ * erstellt von: Nick Jokers
+ */
 function addLetter(letter) {
   if (currentGuess.value.length < GUESS_LENGTH && !isGameOver.value && canMakeGuess.value) {
     currentGuess.value += letter.toUpperCase()
   }
 }
 
+/**
+ * Entfernt den letzten Buchstaben vom aktuellen Rateversuch.
+ * Keine Parameter.
+ * Funktion: Löscht das letzte Zeichen im aktuellen Wort.
+ * erstellt von: Nick Jokers
+ */
 function deleteLetter() {
   currentGuess.value = currentGuess.value.slice(0, -1)
 }
 
+/**
+ * Gibt den aktuellen Rateversuch ab.
+ * Keine Parameter.
+ * Funktion: Prüft und sendet den Rateversuch, aktualisiert das Grid und Keyboard.
+ * erstellt von: Nick Jokers
+ */
 async function submitGuess() {
   if (currentGuess.value.length !== GUESS_LENGTH || isGameOver.value || !canMakeGuess.value) {
     if (!canMakeGuess.value) {
@@ -116,6 +197,12 @@ async function submitGuess() {
   }
 }
 
+/**
+ * Aktualisiert die Farben der Tastatur basierend auf dem Rateversuch.
+ * @param {string} guess - Der abgegebene Rateversuch
+ * Funktion: Setzt die Farben für korrekt, vorhanden, falsch.
+ * erstellt von: Nick Jokers
+ */
 function updateKeyboardColors(guess) {
   const tempColors = { ...keyboardColors.value }
   for (let i = 0; i < guess.length; i++) {
@@ -136,6 +223,12 @@ function updateKeyboardColors(guess) {
   keyboardColors.value = tempColors
 }
 
+/**
+ * Behandelt Tastatureingaben vom echten Keyboard.
+ * @param {KeyboardEvent} e - Das Keyboard-Event
+ * Funktion: Leitet Eingaben an die passenden Methoden weiter.
+ * erstellt von: Nick Jokers
+ */
 function handleKeyPress(e) {
   const key = e.key.toLowerCase()
   if (key === 'enter') submitGuess()
@@ -143,8 +236,14 @@ function handleKeyPress(e) {
   else if (key.length === 1 && key.match(/[a-zäöü]/i)) addLetter(key)
 }
 
+// WebSocket-Instanz (lokal)
 let ws
 
+/**
+ * Lifecycle-Hook: Wird beim Mounten der Komponente ausgeführt.
+ * Funktion: Initialisiert das Spiel, lädt das Lösungswort, setzt Event-Listener.
+ * erstellt von: Nick Jokers
+ */
 onMounted(async () => {
   connectedUsers.value = [] // Reset bei jedem Mount
 
@@ -266,6 +365,11 @@ onMounted(async () => {
   })
 })
 
+/**
+ * Lifecycle-Hook: Wird beim Unmounten der Komponente ausgeführt.
+ * Funktion: Entfernt Event-Listener und schließt die WebSocket-Verbindung.
+ * erstellt von: Nick Jokers
+ */
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyPress)
   closeWebSocket()

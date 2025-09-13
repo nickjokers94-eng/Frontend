@@ -2,23 +2,41 @@
 import { ref } from 'vue'
 import { loginAPI, registerAPI, changePasswordAPI } from '../api.js'
 
+// Emits das Event 'login-successful' nach erfolgreichem Login
 const emit = defineEmits(['login-successful'])
 
+// Benutzername für Login/Registrierung
 const username = ref('')
+// Passwort für Login/Registrierung
 const password = ref('')
+// Fehlermeldung für Login/Registrierung
 const error = ref(null)
+// Erfolgsmeldung für Registrierung
 const success = ref(null)
+// Ladezustand für Buttons
 const isLoading = ref(false)
 
-// Passwort ändern Modal
+// Passwort ändern Modal sichtbar?
 const showChangePw = ref(false)
+// Benutzername für Passwortänderung
 const pwUser = ref('')
+// Altes Passwort für Passwortänderung
 const oldPassword = ref('')
+// Neues Passwort für Passwortänderung
 const newPassword = ref('')
+// Bestätigung neues Passwort für Passwortänderung
 const confirmPassword = ref('')
+// Fehlermeldung für Passwortänderung
 const pwError = ref('')
+// Erfolgsmeldung für Passwortänderung
 const pwMessage = ref('')
 
+/**
+ * Meldet den Benutzer an.
+ * Keine Parameter.
+ * Funktion: Ruft das Login-API auf und gibt das Ergebnis an das Parent-Component weiter.
+ * erstellt von: Nick Jokers
+ */
 async function login() {
   isLoading.value = true
   error.value = null
@@ -33,6 +51,12 @@ async function login() {
   }
 }
 
+/**
+ * Registriert einen neuen Benutzer.
+ * Keine Parameter.
+ * Funktion: Ruft das Register-API auf und zeigt Erfolg/Fehler an.
+ * erstellt von: Nick Jokers
+ */
 async function register() {
   if (!username.value || !password.value) {
     error.value = 'Bitte Benutzername und Passwort eingeben'
@@ -54,6 +78,12 @@ async function register() {
   }
 }
 
+/**
+ * Öffnet das Passwort ändern Modal.
+ * Keine Parameter.
+ * Funktion: Setzt die Modal-Variablen und zeigt das Modal an.
+ * erstellt von: Nick Jokers
+ */
 function openChangePw() {
   showChangePw.value = true
   pwUser.value = username.value // Username vorausfüllen
@@ -64,10 +94,22 @@ function openChangePw() {
   pwMessage.value = ''
 }
 
+/**
+ * Schließt das Passwort ändern Modal.
+ * Keine Parameter.
+ * Funktion: Blendet das Modal aus.
+ * erstellt von: Nick Jokers
+ */
 function closeChangePw() {
   showChangePw.value = false
 }
 
+/**
+ * Ändert das Passwort des Benutzers.
+ * Keine Parameter.
+ * Funktion: Validiert Eingaben und ruft das Passwort-API auf.
+ * erstellt von: Nick Jokers
+ */
 async function changePassword() {
   pwError.value = ''
   pwMessage.value = ''

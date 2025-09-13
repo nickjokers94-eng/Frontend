@@ -1,35 +1,50 @@
-# vue-worti
+## Allgemeine Installationsanleitung
 
-This template should help get you started developing with Vue 3 in Vite.
+### Voraussetzungen
 
-## Recommended IDE Setup
+- **Node.js** (empfohlen: Version 18 oder neuer)  
+  [Download Node.js](https://nodejs.org/)
+- **npm** (wird mit Node.js installiert)
+- Optional: [VSCode](https://code.visualstudio.com/) als Editor
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+### Projekt einrichten
 
-## Customize configuration
+1. **Repository klonen**  
+   Lade das Projekt herunter oder klone es mit git:
+   ```sh
+   git clone <REPOSITORY-URL>
+   cd vue-worti-klon
+   ```
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+2. **Abhängigkeiten installieren**  
+   Im Projektordner im Terminal ausführen:
+   ```sh
+   npm install
+   ```
 
-## Project Setup
+3. **Entwicklungsserver starten**  
+   Starte das Frontend mit Hot-Reload:
+   ```sh
+   npm run dev
+   ```
+   Die Anwendung ist dann meist unter [http://localhost:5173](http://localhost:5173) erreichbar.
 
-```sh
-npm install
-```
+4. **Für Produktion bauen**  
+   Um eine optimierte Version zu erstellen:
+   ```sh
+   npm run build
+   ```
 
-### Compile and Hot-Reload for Development
+5. **Linter ausführen (optional)**  
+   Um den Code zu prüfen:
+   ```sh
+   npm run lint
+   ```
 
-```sh
-npm run dev
-```
+### Hinweise
 
-### Compile and Minify for Production
+- Das Frontend erwartet ein laufendes Backend auf `http://localhost:8080` (z.B. Spring Boot).
+- Für die volle Funktionalität muss das Backend und Websocket separat gestartet werden.
+- Bei Problemen mit Ports oder Abhängigkeiten bitte Node.js-Version prüfen.
 
-```sh
-npm run build
-```
-
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-npm run lint
-```
+---

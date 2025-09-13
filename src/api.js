@@ -1,22 +1,48 @@
 // src/api.js - Echte Backend-Integration
 
 // API-Konfiguration für Backend-Integration
+// erstellt von: Nick Jokers
 const API_BASE_URL = 'http://localhost:8080'; // Spring Boot Standard-Port
 
 // Standard Spring Security Credentials
+// erstellt von: Nick Jokers
 const SPRING_SECURITY_USER = 'user';
 const SPRING_SECURITY_PASSWORD = 'passwordtest';
 
 // --- Hilfsfunktionen ---
+
+/**
+ * Prüft, ob der Benutzername gültig ist.
+ * @param {string} username - Der zu prüfende Benutzername
+ * @returns {boolean} true, wenn gültig
+ * Funktion: Erlaubt Buchstaben, Zahlen, _, @, . und - und mind. 3 Zeichen.
+ * erstellt von: Nick Jokers
+ */
 function isValidUsername(username) {
     return /^[a-zA-Z0-9_@.-]+$/.test(username) && username.length >= 3;
 }
 
+/**
+ * Prüft, ob das Passwort gültig ist.
+ * @param {string} pw - Das zu prüfende Passwort
+ * @returns {boolean} true, wenn gültig
+ * Funktion: Mindestens 3 Zeichen, String.
+ * erstellt von: Nick Jokers
+ */
 function isValidPassword(pw) {
     return typeof pw === 'string' && pw.length >= 3;
 }
 
-// Hilfsfunktion für API-Aufrufe mit HTTP Basic Auth
+/**
+ * Führt einen API-Aufruf mit HTTP Basic Auth durch.
+ * @param {string} endpoint - API-Endpunkt
+ * @param {string} method - HTTP-Methode ('GET', 'POST', etc.)
+ * @param {object|null} data - Zu sendende Daten
+ * @param {boolean} requiresAuth - true, wenn Authentifizierung benötigt wird
+ * @returns {Promise<object>} Antwortobjekt
+ * Funktion: Baut Request zusammen, führt ihn aus und gibt das Ergebnis zurück.
+ * erstellt von: Nick Jokers
+ */
 async function apiCall(endpoint, method = 'GET', data = null, requiresAuth = true) {
   const config = {
     method,
@@ -65,9 +91,11 @@ async function apiCall(endpoint, method = 'GET', data = null, requiresAuth = tru
 
 /**
  * Registrierung eines neuen Users.
- * @param {string} username
- * @param {string} password
- * @returns {Promise<object>}
+ * @param {string} username - Benutzername
+ * @param {string} password - Passwort
+ * @returns {Promise<object>} Ergebnisobjekt
+ * Funktion: Registriert einen neuen User über das Backend.
+ * erstellt von: Nick Jokers
  */
 export async function registerAPI(username, password) {
     if (!isValidUsername(username)) {
@@ -88,10 +116,12 @@ export async function registerAPI(username, password) {
 }
 
 /**
- * Benutzer-Login
- * @param {string} username
- * @param {string} password
- * @returns {Promise<object>}
+ * Benutzer-Login.
+ * @param {string} username - Benutzername
+ * @param {string} password - Passwort
+ * @returns {Promise<object>} Ergebnisobjekt
+ * Funktion: Meldet den User am Backend an.
+ * erstellt von: Nick Jokers
  */
 export async function loginAPI(username, password) {
     try {
@@ -132,8 +162,11 @@ export async function loginAPI(username, password) {
 }
 
 /**
- * Highscore-Liste abrufen
- * @returns {Promise<object>}
+ * Highscore-Liste abrufen.
+ * @param {string|null} currentUserName - Aktueller Benutzername (optional)
+ * @returns {Promise<object>} Highscore-Liste
+ * Funktion: Holt und sortiert die Highscores, markiert eigenen Rang.
+ * erstellt von: Nick Jokers
  */
 export async function getHighscoresAPI(currentUserName = null) {
     try {
@@ -169,9 +202,11 @@ export async function getHighscoresAPI(currentUserName = null) {
 }
 
 /**
- * Wortliste abrufen (für Admins)
+ * Wortliste abrufen (für Admins).
  * @param {string} adminUser - Username des Admins
- * @returns {Promise<object>}
+ * @returns {Promise<object>} Wortliste
+ * Funktion: Holt alle Wörter aus dem Backend.
+ * erstellt von: Nick Jokers
  */
 export async function getWordsAPI(adminUser) {
     try {
@@ -191,10 +226,12 @@ export async function getWordsAPI(adminUser) {
 }
 
 /**
- * Wort hinzufügen (Admin-Funktion)
+ * Wort hinzufügen (Admin-Funktion).
  * @param {string} adminUser - Username des Admins
  * @param {string} word - Das hinzuzufügende Wort
- * @returns {Promise<object>}
+ * @returns {Promise<object>} Ergebnisobjekt
+ * Funktion: Fügt ein neues Wort hinzu, prüft auf Gültigkeit.
+ * erstellt von: Nick Jokers
  */
 export async function addWordAPI(adminUser, word) {
     if (!word || word.length !== 5) {
@@ -214,11 +251,13 @@ export async function addWordAPI(adminUser, word) {
 }
 
 /**
- * Admin: User freischalten
+ * Admin: User freischalten.
  * @param {string} adminUser - Username des Admins
  * @param {string} targetUser - Username des freizuschaltenden Users
  * @param {boolean} active - true = freischalten, false wird ignoriert (nutze deleteUserAPI)
- * @returns {Promise<object>}
+ * @returns {Promise<object>} Ergebnisobjekt
+ * Funktion: Schaltet einen User frei oder löscht ihn.
+ * erstellt von: Nick Jokers
  */
 export async function setUserActiveAPI(adminUser, targetUser, active) {
     if (!active) {
@@ -237,10 +276,12 @@ export async function setUserActiveAPI(adminUser, targetUser, active) {
 }
 
 /**
- * Admin: User löschen
+ * Admin: User löschen.
  * @param {string} adminUser - Username des Admins
  * @param {string} targetUser - Username des zu löschenden Users
- * @returns {Promise<object>}
+ * @returns {Promise<object>} Ergebnisobjekt
+ * Funktion: Löscht einen User im Backend.
+ * erstellt von: Nick Jokers
  */
 export async function deleteUserAPI(adminUser, targetUser) {
     try {
@@ -255,11 +296,13 @@ export async function deleteUserAPI(adminUser, targetUser) {
 }
 
 /**
- * Passwort ändern
+ * Passwort ändern.
  * @param {string} username - Username
  * @param {string} oldPassword - Altes Passwort (wird ignoriert, da Backend es nicht braucht)
  * @param {string} newPassword - Neues Passwort
- * @returns {Promise<object>}
+ * @returns {Promise<object>} Ergebnisobjekt
+ * Funktion: Ändert das Passwort eines Users.
+ * erstellt von: Nick Jokers
  */
 export async function changePasswordAPI(username, oldPassword, newPassword) {
     if (!isValidPassword(newPassword)) {
@@ -281,9 +324,11 @@ export async function changePasswordAPI(username, oldPassword, newPassword) {
 }
 
 /**
- * User-Details abrufen (für Admin-Panel)
+ * User-Details abrufen (für Admin-Panel).
  * @param {number} userID - User ID
- * @returns {Promise<object>}
+ * @returns {Promise<object>} Userdaten
+ * Funktion: Holt die Details eines Users.
+ * erstellt von: Nick Jokers
  */
 export async function getUserAPI(userID) {
     try {
@@ -305,8 +350,10 @@ export async function getUserAPI(userID) {
 }
 
 /**
- * Neues Lösungswort aus der Backend-Wortliste abrufen
- * @returns {Promise<object>}
+ * Neues Lösungswort aus der Backend-Wortliste abrufen.
+ * @returns {Promise<object>} Lösungswort
+ * Funktion: Holt ein zufälliges Wort aus der Wortliste.
+ * erstellt von: Nick Jokers
  */
 export async function getNewSolutionWordAPI() {
     try {
@@ -331,9 +378,11 @@ export async function getNewSolutionWordAPI() {
 // === RUNDENVERWALTUNG-APIs ===
 
 /**
- * Neue Runde starten (Admin)
+ * Neue Runde starten (Admin).
  * @param {string} adminUser - Username des Admins
- * @returns {Promise<object>}
+ * @returns {Promise<object>} Rundeninfos
+ * Funktion: Startet eine neue Runde (Demo-Implementierung).
+ * erstellt von: Nick Jokers
  */
 export async function startRoundAPI(adminUser) {
     return new Promise((resolve) => {
@@ -353,8 +402,10 @@ export async function startRoundAPI(adminUser) {
 }
 
 /**
- * Aktuelle Runde abfragen
- * @returns {Promise<object>}
+ * Aktuelle Runde abfragen.
+ * @returns {Promise<object>} Rundeninfos
+ * Funktion: Holt die aktuelle Runde (Demo-Implementierung).
+ * erstellt von: Nick Jokers
  */
 export async function getCurrentRoundAPI() {
     return new Promise((resolve) => {
@@ -376,9 +427,11 @@ export async function getCurrentRoundAPI() {
 }
 
 /**
- * Rateversuch abgeben
+ * Rateversuch abgeben.
  * @param {string} guess - Der Rateversuch
- * @returns {Promise<object>}
+ * @returns {Promise<object>} Ergebnisobjekt
+ * Funktion: Simuliert das Absenden eines Rateversuchs.
+ * erstellt von: Nick Jokers
  */
 export async function submitGuessAPI(guess) {
     return new Promise((resolve, reject) => {
@@ -401,8 +454,10 @@ export async function submitGuessAPI(guess) {
 }
 
 /**
- * Alle Rateversuche der aktuellen Runde abrufen
- * @returns {Promise<object>}
+ * Alle Rateversuche der aktuellen Runde abrufen.
+ * @returns {Promise<object>} Liste der Rateversuche
+ * Funktion: Holt alle bisherigen Rateversuche (Demo).
+ * erstellt von: Nick Jokers
  */
 export async function getAllGuessesAPI() {
     return new Promise((resolve) => {
@@ -419,9 +474,11 @@ export async function getAllGuessesAPI() {
 }
 
 /**
- * Runde beenden (Admin)
+ * Runde beenden (Admin).
  * @param {string} adminUser - Username des Admins
- * @returns {Promise<object>}
+ * @returns {Promise<object>} Ergebnisobjekt
+ * Funktion: Beendet die aktuelle Runde (Demo).
+ * erstellt von: Nick Jokers
  */
 export async function endRoundAPI(adminUser) {
     return new Promise((resolve) => {
@@ -443,9 +500,11 @@ export async function endRoundAPI(adminUser) {
 // === BENUTZERVERWALTUNG-APIs ===
 
 /**
- * User-Liste abrufen (Admin)
+ * User-Liste abrufen (Admin).
  * @param {string} adminUser - Username des Admins
- * @returns {Promise<object>}
+ * @returns {Promise<object>} Liste der User
+ * Funktion: Holt alle User für das Admin-Panel.
+ * erstellt von: Nick Jokers
  */
 export async function getUsersAPI(adminUser) {
     try {
@@ -466,10 +525,12 @@ export async function getUsersAPI(adminUser) {
 }
 
 /**
- * User anlegen (Admin)
+ * User anlegen (Admin).
  * @param {string} adminUser - Username des Admins
  * @param {object} userData - User-Daten
- * @returns {Promise<object>}
+ * @returns {Promise<object>} Ergebnisobjekt
+ * Funktion: Legt einen neuen User an (Demo).
+ * erstellt von: Nick Jokers
  */
 export async function createUserAPI(adminUser, userData) {
     return new Promise((resolve, reject) => {
@@ -488,11 +549,13 @@ export async function createUserAPI(adminUser, userData) {
 }
 
 /**
- * User bearbeiten (Admin)
+ * User bearbeiten (Admin).
  * @param {string} adminUser - Username des Admins
  * @param {string} targetUser - Username des zu bearbeitenden Users
  * @param {object} updates - Zu aktualisierende Daten
- * @returns {Promise<object>}
+ * @returns {Promise<object>} Ergebnisobjekt
+ * Funktion: Aktualisiert Userdaten (Demo).
+ * erstellt von: Nick Jokers
  */
 export async function updateUserAPI(adminUser, targetUser, updates) {
     return new Promise((resolve) => {
@@ -504,6 +567,16 @@ export async function updateUserAPI(adminUser, targetUser, updates) {
         }, 400);
     });
 }
+
+/**
+ * Rolle eines Users aktualisieren (Admin).
+ * @param {string} adminUser - Username des Admins
+ * @param {string} targetUser - Username des Users
+ * @param {string} newRole - Neue Rolle
+ * @returns {Promise<object>} Ergebnisobjekt
+ * Funktion: Setzt die Rolle eines Users im Backend.
+ * erstellt von: Nick Jokers
+ */
 export async function updateUserRoleAPI(adminUser, targetUser, newRole) {
     try {
         const result = await apiCall('/user/updateRole', 'PUT', { username: targetUser, role: newRole });
@@ -519,10 +592,12 @@ export async function updateUserRoleAPI(adminUser, targetUser, newRole) {
 // === WORTLISTE-APIs ===
 
 /**
- * Wort löschen (Admin)
+ * Wort löschen (Admin).
  * @param {string} adminUser - Username des Admins
- * @param {string} wordId - ID des zu löschenden Worts
- * @returns {Promise<object>}
+ * @param {string} word - Das zu löschende Wort
+ * @returns {Promise<object>} Ergebnisobjekt
+ * Funktion: Löscht ein Wort anhand der Eingabe.
+ * erstellt von: Nick Jokers
  */
 export async function deleteWordByInputAPI(adminUser, word) {
     if (!word || word.length !== 5) {
@@ -539,11 +614,13 @@ export async function deleteWordByInputAPI(adminUser, word) {
 }
 
 /**
- * Wort bearbeiten (Admin)
+ * Wort bearbeiten (Admin).
  * @param {string} adminUser - Username des Admins
  * @param {string} wordId - ID des zu bearbeitenden Worts
  * @param {string} newWord - Das neue Wort
- * @returns {Promise<object>}
+ * @returns {Promise<object>} Ergebnisobjekt
+ * Funktion: Aktualisiert ein Wort (Demo).
+ * erstellt von: Nick Jokers
  */
 export async function updateWordAPI(adminUser, wordId, newWord) {
     return new Promise((resolve, reject) => {

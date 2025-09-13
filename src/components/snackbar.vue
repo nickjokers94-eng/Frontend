@@ -16,8 +16,14 @@
 </template>
 
 <script setup>
+/**
+ * Props für die Snackbar-Komponente.
+ * @property {Array} snackbars - Liste der anzuzeigenden Snackbar-Objekte
+ * Funktion: Übergibt die Snackbar-Nachrichten an die Komponente.
+ * erstellt von: Nick Jokers
+ */
 const props = defineProps({
-  snackbars: Array
+  snackbars: Array // Array der Snackbar-Objekte
 })
 </script>
 

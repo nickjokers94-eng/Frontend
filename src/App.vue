@@ -1,15 +1,28 @@
 <script setup>
+// Importiert reaktive Hilfsmittel von Vue
 import { ref, computed } from 'vue'
+// Importiert API-Funktionen für Backend-Kommunikation
 import { 
   getHighscoresAPI, setUserActiveAPI, deleteUserAPI, changePasswordAPI, getUsersAPI, 
   updateUserRoleAPI, addWordAPI, getWordsAPI, deleteWordByInputAPI 
 } from './api.js'
+// Importiert Komponenten
 import GameScreen from './components/gamescreen.vue'
 import StartScreen from './components/startscreen.vue'
 import Snackbar from './components/snackbar.vue'
 
 // --- Snackbar Queue ---
+// Snackbar-Nachrichten-Warteschlange
 const snackbarQueue = ref([])
+
+/**
+ * Zeigt eine Snackbar-Nachricht an.
+ * @param {string} message - Die Nachricht
+ * @param {string} type - Typ der Nachricht ('info', 'success', 'error')
+ * @param {number} duration - Anzeigedauer in ms
+ * Funktion: Fügt eine Snackbar zur Warteschlange hinzu und entfernt sie nach Ablauf.
+ * erstellt von: Nick Jokers
+ */
 function showSnackbar(message, type = 'info', duration = 5000) {
   const id = Date.now() + Math.random()
   snackbarQueue.value.push({ id, message, type })
@@ -19,46 +32,54 @@ function showSnackbar(message, type = 'info', duration = 5000) {
 }
 
 // --- Zustandsverwaltung ---
+// Aktueller Screen ('start', 'game', 'admin', 'change-password')
 const activeScreen = ref('start')
+// Aktuell eingeloggter Benutzer (Objekt oder null)
 const currentUser = ref(null)
 
 // Highscore-Modal-Zustand
-const showHighscoreModal = ref(false)
-const highscores = ref([])
+const showHighscoreModal = ref(false) // Sichtbarkeit des Highscore-Modals
+const highscores = ref([]) // Highscore-Liste
 
 // Hilfe-Modal-Zustand
-const showHelpModal = ref(false)
+const showHelpModal = ref(false) // Sichtbarkeit des Hilfe-Modals
 
 // Admin-Zustand
-const pendingUsers = ref([]) // Benutzer die auf Freischaltung warten
+const pendingUsers = ref([]) // Benutzer, die auf Freischaltung warten
 const selectedUserIds = ref(new Set()) // IDs der ausgewählten Benutzer
-const adminMessage = ref('')
-const adminError = ref('')
+const adminMessage = ref('') // Admin-Erfolgsmeldung
+const adminError = ref('') // Admin-Fehlermeldung
 
 // Für Rollenänderung: Temporäre Rollen pro User speichern
-const tempRoles = ref({})
+const tempRoles = ref({}) // Map: userId -> Rolle
 
 // Wörter hinzufügen/löschen
-const newWord = ref('')
-const wordMessage = ref('')
-const wordError = ref('')
-const deleteWordInput = ref('')
-const deleteWordMessage = ref('')
-const deleteWordError = ref('')
+const newWord = ref('') // Neues Wort zum Hinzufügen
+const wordMessage = ref('') // Erfolgsmeldung für Wort
+const wordError = ref('') // Fehlermeldung für Wort
+const deleteWordInput = ref('') // Wort zum Löschen
+const deleteWordMessage = ref('') // Erfolgsmeldung für Löschen
+const deleteWordError = ref('') // Fehlermeldung für Löschen
 
-// Wortliste für Admin-UI (optional, falls du die Liste anzeigen willst)
-const wordList = ref([])
-const wordListError = ref('')
+// Wortliste für Admin-UI
+const wordList = ref([]) // Liste aller Wörter
+const wordListError = ref('') // Fehler beim Laden der Wortliste
 
 // Passwort-Ändern-Zustand
-const oldPassword = ref('')
-const newPassword = ref('')
-const confirmPassword = ref('')
-const passwordMessage = ref('')
-const passwordError = ref('')
+const oldPassword = ref('') // Altes Passwort
+const newPassword = ref('') // Neues Passwort
+const confirmPassword = ref('') // Neues Passwort wiederholen
+const passwordMessage = ref('') // Erfolgsmeldung Passwort
+const passwordError = ref('') // Fehlermeldung Passwort
 
 // --- Methoden ---
 
+/**
+ * Wird nach erfolgreichem Login aufgerufen.
+ * @param {object} userData - Die Benutzerdaten
+ * Funktion: Setzt den aktuellen User und wechselt zum Spiel-Screen.
+ * erstellt von: Nick Jokers
+ */
 function handleLoginSuccess(userData) {
   currentUser.value = userData.data
   localStorage.setItem('currentUser', JSON.stringify({
@@ -67,29 +88,66 @@ function handleLoginSuccess(userData) {
   activeScreen.value = 'game'
 }
 
+/**
+ * Loggt den aktuellen Benutzer aus.
+ * Keine Parameter.
+ * Funktion: Entfernt User aus dem State und wechselt zum Start-Screen.
+ * erstellt von: Nick Jokers
+ */
 function handleLogout() {
   currentUser.value = null
   localStorage.removeItem('currentUser')
   activeScreen.value = 'start'
 }
 
+/**
+ * Öffnet das Highscore-Modal und lädt die Highscores.
+ * Keine Parameter.
+ * Funktion: Ruft Highscores vom Backend ab und zeigt das Modal.
+ * erstellt von: Nick Jokers
+ */
 async function openHighscore() {
   const response = await getHighscoresAPI(currentUser.value?.user)
   highscores.value = response.data
   showHighscoreModal.value = true
 }
 
+/**
+ * Schließt das Highscore-Modal.
+ * Keine Parameter.
+ * Funktion: Setzt die Sichtbarkeit auf false.
+ * erstellt von: Nick Jokers
+ */
 function closeHighscore() {
   showHighscoreModal.value = false
 }
 
+/**
+ * Öffnet das Hilfe-Modal.
+ * Keine Parameter.
+ * Funktion: Setzt die Sichtbarkeit auf true.
+ * erstellt von: Nick Jokers
+ */
 function openHelp() {
   showHelpModal.value = true
 }
+
+/**
+ * Schließt das Hilfe-Modal.
+ * Keine Parameter.
+ * Funktion: Setzt die Sichtbarkeit auf false.
+ * erstellt von: Nick Jokers
+ */
 function closeHelp() {
   showHelpModal.value = false
 }
 
+/**
+ * Lädt alle Benutzer, die noch nicht aktiviert wurden (nur für Admin).
+ * Keine Parameter.
+ * Funktion: Holt Benutzerliste vom Backend und filtert inaktive User.
+ * erstellt von: Nick Jokers
+ */
 async function loadPendingUsers() {
   if (!currentUser.value || currentUser.value.role !== 'admin') return
   try {
@@ -106,6 +164,12 @@ async function loadPendingUsers() {
   }
 }
 
+/**
+ * Markiert oder demarkiert einen Benutzer in der Auswahl.
+ * @param {object} user - Benutzerobjekt
+ * Funktion: Fügt die User-ID zur Auswahl hinzu oder entfernt sie.
+ * erstellt von: Nick Jokers
+ */
 function toggleUserSelection(user) {
   if (selectedUserIds.value.has(user.id)) {
     selectedUserIds.value.delete(user.id)
@@ -116,6 +180,12 @@ function toggleUserSelection(user) {
   }
 }
 
+/**
+ * Aktiviert alle ausgewählten Benutzer.
+ * Keine Parameter.
+ * Funktion: Setzt die ausgewählten User auf aktiv im Backend.
+ * erstellt von: Nick Jokers
+ */
 async function activateSelectedUsers() {
   if (selectedUserIds.value.size === 0) {
     adminError.value = 'Keine Benutzer ausgewählt'
@@ -135,6 +205,12 @@ async function activateSelectedUsers() {
   }
 }
 
+/**
+ * Löscht alle ausgewählten Benutzer.
+ * Keine Parameter.
+ * Funktion: Entfernt die ausgewählten User im Backend.
+ * erstellt von: Nick Jokers
+ */
 async function deleteSelectedUsers() {
   if (selectedUserIds.value.size === 0) {
     adminError.value = 'Keine Benutzer ausgewählt'
@@ -154,6 +230,12 @@ async function deleteSelectedUsers() {
   }
 }
 
+/**
+ * Lädt die Wortliste für die Admin-UI.
+ * Keine Parameter.
+ * Funktion: Holt alle Wörter vom Backend.
+ * erstellt von: Nick Jokers
+ */
 async function loadWordList() {
   try {
     const result = await getWordsAPI(currentUser.value.user)
@@ -164,6 +246,12 @@ async function loadWordList() {
   }
 }
 
+/**
+ * Öffnet das Admin-Panel.
+ * Keine Parameter.
+ * Funktion: Wechselt zum Admin-Screen und lädt Daten.
+ * erstellt von: Nick Jokers
+ */
 function openAdminPanel() {
   activeScreen.value = 'admin'
   selectedUserIds.value = new Set()
@@ -173,6 +261,12 @@ function openAdminPanel() {
   loadWordList()
 }
 
+/**
+ * Aktualisiert die Rolle eines Benutzers.
+ * @param {object} user - Benutzerobjekt
+ * Funktion: Setzt die Rolle im Backend.
+ * erstellt von: Nick Jokers
+ */
 async function updateRole(user) {
   try {
     await updateUserRoleAPI(currentUser.value.user, user.user, tempRoles.value[user.id])
@@ -183,6 +277,12 @@ async function updateRole(user) {
   }
 }
 
+/**
+ * Fügt ein neues Wort hinzu.
+ * Keine Parameter.
+ * Funktion: Validiert und sendet das neue Wort ans Backend.
+ * erstellt von: Nick Jokers
+ */
 async function addWord() {
   wordMessage.value = ''
   wordError.value = ''
@@ -204,6 +304,12 @@ async function addWord() {
   }
 }
 
+/**
+ * Löscht ein Wort anhand der Eingabe.
+ * Keine Parameter.
+ * Funktion: Validiert und löscht das Wort im Backend.
+ * erstellt von: Nick Jokers
+ */
 async function deleteWordByInput() {
   deleteWordMessage.value = ''
   deleteWordError.value = ''
@@ -221,6 +327,12 @@ async function deleteWordByInput() {
   }
 }
 
+/**
+ * Ändert das Passwort des aktuellen Benutzers.
+ * Keine Parameter.
+ * Funktion: Validiert Eingaben und sendet Passwortänderung ans Backend.
+ * erstellt von: Nick Jokers
+ */
 async function changePassword() {
   passwordError.value = ''
   passwordMessage.value = ''
@@ -251,6 +363,7 @@ async function changePassword() {
   }
 }
 
+// Computed Property: true, wenn ein User eingeloggt ist
 const isLoggedIn = computed(() => activeScreen.value !== 'start')
 </script>
 

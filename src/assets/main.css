@@ -1,4 +1,8 @@
-/* General Body & Font Styles */
+/* 
+ * Allgemeine Body- und Schriftarten-Styles
+ * Funktion: Setzt Grundlayout, Farben und Schriftarten für die gesamte Anwendung.
+ * erstellt von: Nick Jokers
+ */
 body {
   font-family: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
   text-align: center;
@@ -9,19 +13,32 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* 
+ * Layout für Haupt-Container und Screens
+ * Funktion: Zentriert und begrenzt die Breite der Hauptinhalte.
+ * erstellt von: Nick Jokers
+ */
 .screen {
   padding: 20px;
   max-width: 1200px;
   margin: 0 auto;
 }
 
-/* --- Logo --- */
+/* 
+ * Logo-Styles
+ * Funktion: Definiert Größe und Abstand des Logos.
+ * erstellt von: Nick Jokers
+ */
 .logo-image {
   max-width: 150px;
   margin-bottom: 1rem;
 }
 
-/* --- Login Screen --- */
+/* 
+ * Login-Formular-Styles
+ * Funktion: Gestaltet das Login- und Registrierungsformular.
+ * erstellt von: Nick Jokers
+ */
 .login-form {
   max-width: 400px;
   margin: 2rem auto;
@@ -63,7 +80,11 @@ body {
   cursor: not-allowed;
 }
 
-/* --- General Button Styles --- */
+/* 
+ * Allgemeine Button-Styles
+ * Funktion: Definiert das Aussehen und Verhalten von Schaltflächen.
+ * erstellt von: Nick Jokers
+ */
 button {
   padding: 10px 20px;
   margin: 5px;
@@ -105,7 +126,11 @@ button:hover {
   background-color: #5a6268;
 }
 
-/* --- Game Screen Header --- */
+/* 
+ * Header-Styles für das Spiel
+ * Funktion: Gestaltet die Schaltflächen im Header-Bereich des Spiels.
+ * erstellt von: Nick Jokers
+ */
 .top-buttons {
   display: flex;
   justify-content: center;
@@ -134,7 +159,11 @@ button:hover {
   width: 90%;
 }
 
-/* --- Game Layout & Side Boxes --- */
+/* 
+ * Spiel-Layout und Side-Boxen
+ * Funktion: Definiert das Rasterlayout für das Spiel und gestaltet die Seitenkästen.
+ * erstellt von: Nick Jokers
+ */
 .game-layout {
   display: grid;
   grid-template-columns: 1fr 2.5fr 1fr; /* Give center more space */
@@ -177,7 +206,11 @@ button:hover {
   color: #3a3a3c;
 }
 
-/* --- Neue Styles für Lastenheft-Features --- */
+/* 
+ * Neue Styles für Lastenheft-Features
+ * Funktion: Gestaltet neue Elemente gemäß den Anforderungen des Lastenhefts.
+ * erstellt von: Nick Jokers
+ */
 .last-word {
   font-size: 24px;
   font-weight: bold;
@@ -219,7 +252,11 @@ button:hover {
   border-radius: 12px;
 }
 
-/* --- Game Grid (Wordle Tiles) --- */
+/* 
+ * Spielraster-Styles (Wordle-Tiles)
+ * Funktion: Gestaltet das Raster für die Wörter im Spiel.
+ * erstellt von: Nick Jokers
+ */
 .game-center {
   max-width: 600px; /* Tastatur und Gitter weiter verbreitert */
   margin: 0 auto;
@@ -261,7 +298,11 @@ button:hover {
   transition: all 0.2s ease;
 }
 
-/* --- Keyboard --- */
+/* 
+ * Tastatur-Styles (On-Screen Keyboard)
+ * Funktion: Gestaltet die Bildschirmtastatur für das Wortratespiel.
+ * erstellt von: Nick Jokers
+ */
 #keyboard {
   margin-top: 30px;
   display: flex;
@@ -323,7 +364,11 @@ button:hover {
   border-color: #3a3a3c;
 }
 
-/* --- Footer & Admin --- */
+/* 
+ * Footer- und Admin-Styles
+ * Funktion: Gestaltet den Fußbereich und die Administrationsschnittstelle.
+ * erstellt von: Nick Jokers
+ */
 footer {
   margin-top: 40px;
   border-top: 1px solid #d3d6da;
@@ -396,7 +441,11 @@ textarea:focus {
   border-color: #878a8c;
 }
 
-/* --- Highscore Modal Styles --- */
+/* 
+ * Highscore-Modal-Styles
+ * Funktion: Gestaltet das Modal-Fenster für die Highscore-Anzeige.
+ * erstellt von: Nick Jokers
+ */
 .modal {
   display: block; /* Vue steuert die Sichtbarkeit mit v-if, daher immer 'block' */
   position: fixed; /* Bleibt an Ort und Stelle, auch beim Scrollen */
@@ -479,7 +528,11 @@ textarea:focus {
   }
 }
 
-/* --- Header Logo (Game/Admin Screen) --- */
+/* 
+ * Header-Logo-Styles (Spiel-/Admin-Bildschirm)
+ * Funktion: Positioniert und gestaltet das Logo im Header-Bereich.
+ * erstellt von: Nick Jokers
+ */
 .header-logo {
   position: fixed; /* Positioniert das Logo relativ zum Browserfenster */
   top: 15px;
@@ -487,9 +540,12 @@ textarea:focus {
   height: 60px; /* Größe angepasst */
   z-index: 1001; /* Stellt sicher, dass es über dem Highscore-Fenster liegt */
 }
-/* Responsive Design für Startscreen, Gamescreen und Adminseite */
 
-/* --- Allgemein: Für kleine Bildschirme --- */
+/* 
+ * Responsive Design
+ * Funktion: Passt Layout und Komponenten für verschiedene Bildschirmgrößen an.
+ * erstellt von: Nick Jokers
+ */
 @media (max-width: 900px) {
   .screen {
     padding: 8px;
