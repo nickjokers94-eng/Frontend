@@ -186,16 +186,14 @@ export async function addWordAPI(adminUser, word) {
     if (!word || word.length !== 5) {
         throw { success: false, error: 'Wort muss genau 5 Buchstaben haben.' };
     }
-    
-    try {
-        const result = await apiCall('/words/addWord', 'POST', { word });
-        return {
-            success: true,
-            message: 'Wort hinzugefügt.'
-        };
-    } catch (error) {
-        throw error;
+    const result = await apiCall('/words/addWord', 'POST', { word });
+    if (result.data === false) {
+        throw { success: false, error: 'Das Wort existiert bereits.' };
     }
+    return {
+        success: true,
+        message: 'Wort hinzugefügt.'
+    };
 }
 
 /**
