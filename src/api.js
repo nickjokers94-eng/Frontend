@@ -308,21 +308,24 @@ export async function changePasswordAPI(username, oldPassword, newPassword) {
     if (!isValidPassword(newPassword)) {
         throw { success: false, error: 'Neues Passwort zu kurz (min. 3 Zeichen).' };
     }
-    
     try {
         const result = await apiCall('/user/passwordChange', 'PUT', { 
             username, 
-            password: newPassword 
+            oldPassword, 
+            newPassword 
         });
         return {
             success: true,
             message: 'Passwort erfolgreich geändert.'
         };
     } catch (error) {
-        throw error;
+        // Fehlertext vom Backend übernehmen, falls vorhanden
+        throw {
+            success: false,
+            error: error.error || 'Fehler beim Ändern des Passworts'
+        };
     }
 }
-
 /**
  * User-Details abrufen (für Admin-Panel).
  * @param {number} userID - User ID
